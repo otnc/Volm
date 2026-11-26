@@ -8,17 +8,20 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/otnc/Volm/internal/config"
 	"github.com/otnc/Volm/internal/ipc"
 	"github.com/otnc/Volm/internal/settings"
+	"github.com/otnc/Volm/internal/update"
 	"github.com/otnc/Volm/internal/win32"
 	"golang.org/x/sys/windows"
 )
@@ -84,6 +87,11 @@ func runResident(configPath string) {
 	a := newApp(configPath, cfg)
 	mygo.App.OnWindowAllClosed(func() {}) // Volm lives in the tray and opens no windows of its own.
 	mygo.App.OnSecondInstance(func([]string, string) { openSettings() })
+	mygo.App.OnNotificationClick(func(id string) {
+		if id == updateNotificationID {
+			openSettings()
+		}
+	})
 	mygo.App.WhenReady(func() {
 		if err := a.start(); err != nil {
 			log.Printf("starting: %v", err)
@@ -93,6 +101,7 @@ func runResident(configPath string) {
 		if settingsReset {
 			go notifySettingsReset(configPath)
 		}
+		go checkForUpdateAtStart(configPath, cfg.Update)
 		// Starting at login is on by default. The installer sets it; a copy run without one sets it on its first start. A development build would register its temporary executable, so it does not.
 		if firstRun && !mygo.IsDev() {
 			if err := mygo.App.SetOpenAtLogin(true); err != nil {
@@ -189,4 +198,48 @@ func openURL(url string) error {
 		return err
 	}
 	return windows.ShellExecute(0, verb, target, nil, nil, windows.SW_SHOWNORMAL)
+}
+
+const updateNotificationID = "volm-update"
+
+// checkForUpdateAtStart looks for a newer release at most once a day, when the settings allow it, and tells the user with a notification that opens the settings window.
+func checkForUpdateAtStart(configPath string, settings config.Update) {
+	if !settings.CheckOnStartup || !update.DueForCheck(settings.LastCheckedAt, time.Now()) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	rel, err := update.Latest(ctx, settings.Prerelease)
+	switch {
+	case errors.Is(err, update.ErrNoRelease):
+	case err != nil:
+		log.Printf("checking for updates: %v", err)
+		return // try again at the next start rather than in a day
+	}
+	recordUpdateCheck(configPath)
+	current, verErr := update.ParseVersion(mygo.App.Version())
+	if err != nil || verErr != nil || rel.Version.Compare(current) <= 0 {
+		return
+	}
+	n := mygo.NewNotification(mygo.NotificationOptions{
+		ID:    updateNotificationID,
+		Title: "Volm " + rel.Version.String() + " があります",
+		Body:  "クリックすると設定画面を開きます。「更新」のページから更新できます。",
+	})
+	if err := n.Show(); err != nil {
+		log.Printf("notifying update: %v", err)
+	}
+}
+
+// recordUpdateCheck writes the time of the check into the settings file, reading it again first so that changes made since start are kept.
+func recordUpdateCheck(configPath string) {
+	cfg, err := config.Read(configPath)
+	if err != nil {
+		log.Printf("recording the update check: %v", err)
+		return
+	}
+	cfg.Update.LastCheckedAt = time.Now().UTC()
+	if err := config.Save(configPath, cfg); err != nil {
+		log.Printf("recording the update check: %v", err)
+	}
 }

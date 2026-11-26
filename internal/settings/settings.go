@@ -27,6 +27,7 @@ const (
 	pageVolume     = "volume"
 	pageBrightness = "brightness"
 	pageHotkeys    = "hotkeys"
+	pageUpdates    = "updates"
 	pageOSD        = "osd"
 	pageAbout      = "about"
 )
@@ -53,6 +54,7 @@ type window struct {
 	positionLabel  string
 
 	hotkeys hotkeyEditor
+	updates updateState
 	win     *mygo.Window
 
 	displays     []brightness.Display
@@ -142,6 +144,7 @@ func (w *window) view(c *ui.Context) {
 				ui.SidebarItem(c, pageBrightness, w.icons.brightness, "明るさ")
 				ui.SidebarItem(c, pageHotkeys, w.icons.keyboard, "ホットキー")
 				ui.SidebarItem(c, pageOSD, w.icons.osd, "OSD (画面表示)")
+				ui.SidebarItem(c, pageUpdates, w.icons.update, "更新")
 				ui.SidebarItem(c, pageAbout, w.icons.info, "情報")
 			}).Grow(1)
 			ui.Button(c, "").Label("すべての設定を初期値に戻す").Children(func() {
@@ -168,6 +171,8 @@ func (w *window) view(c *ui.Context) {
 					w.hotkeysPage(c)
 				case pageOSD:
 					w.osdPage(c)
+				case pageUpdates:
+					w.updatesPage(c)
 				case pageAbout:
 					w.aboutPage(c)
 				}
@@ -425,7 +430,7 @@ var iconFiles embed.FS
 
 type icons struct {
 	tune, volumeUp, volumeOff, osd, info, restart, mouse,
-	timer, position, visibility, code, gavel, person, login, restartApp, quit, apps, titleBar,
+	timer, position, visibility, code, gavel, person, login, restartApp, quit, apps, titleBar, update, science,
 	brightness, brightnessLow, monitor,
 	keyboard, add, close *ui.SVG
 }
@@ -458,6 +463,8 @@ func loadIcons() icons {
 		quit:          svg("power_settings_new"),
 		apps:          svg("apps"),
 		titleBar:      svg("web_asset"),
+		update:        svg("update"),
+		science:       svg("science"),
 		add:           svg("add"),
 		close:         svg("close"),
 		visibility:    svg("visibility"),
