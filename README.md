@@ -55,8 +55,22 @@ Volm を起動したまま、もう一度 Volm を起動しても、設定画面
 
 設定は `%APPDATA%\Volm\config.json` に、ログは `%APPDATA%\Volm\volm.log` に保存されます。設定ファイルが壊れて読めないときは、そのファイルを `config.json.bak` に移し、初期値で起動します。
 
+## 使っているライブラリと素材
+
+| 名前 | 使い道 | ライセンス |
+|---|---|---|
+| [MyGo](https://github.com/egoist/mygo) | トレイ、設定画面、ビルド | MIT |
+| [purego](https://github.com/ebitengine/purego) | MyGo が使う、cgo を使わない C の関数の呼び出し | Apache-2.0 |
+| [go-ole](https://github.com/go-ole/go-ole) | COM の呼び出し | MIT |
+| [go-wca](https://github.com/moutend/go-wca) | Windows の音量の操作 (Core Audio) | MIT |
+| [go-text/typesetting](https://github.com/go-text/typesetting) | MyGo が使う、文字の組版 | Unlicense OR BSD-3-Clause |
+| [golang.org/x/image](https://pkg.go.dev/golang.org/x/image)、[net](https://pkg.go.dev/golang.org/x/net)、[sys](https://pkg.go.dev/golang.org/x/sys)、[text](https://pkg.go.dev/golang.org/x/text) | Windows の API の呼び出しなど | BSD-3-Clause |
+| [Material Symbols](https://fonts.google.com/icons) | 設定画面の項目のアイコン | Apache-2.0 |
+
+ライセンスの全文は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にまとめてあります。アイコンとロゴは、このリポジトリの `tools/genicons` で描いたものです。
+
 ## ライセンス
 
-Volm は [GNU General Public License v3.0 only](LICENSE) で公開しています。Volm が使っているライブラリと素材のライセンスは、[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にまとめてあります。設定画面の項目のアイコンには、Google の [Material Symbols](https://fonts.google.com/icons) (Apache License 2.0) を使っています。
+Volm は [GNU General Public License v3.0 only](LICENSE) で公開しています。
 
 作者: otoneko.

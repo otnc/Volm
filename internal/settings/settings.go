@@ -251,7 +251,7 @@ func (w *window) aboutPage(c *ui.Context) {
 		})
 	})
 	row(c, w.icons.person, "作者", "", func() { ui.Text(c, "otoneko.") })
-	row(c, w.icons.gavel, "ライセンス", "GNU General Public License v3.0 のみ", func() { ui.Text(c, "GPL-3.0-only") })
+	row(c, w.icons.gavel, "ライセンス", "GNU General Public License v3.0 only", func() { ui.Text(c, "GPL-3.0-only") })
 	row(c, w.icons.code, "ソースコード", "", func() {
 		ui.Link(c, "github.com/otnc/Volm", "https://github.com/otnc/Volm")
 	})
@@ -270,16 +270,19 @@ func (w *window) aboutPage(c *ui.Context) {
 	ui.Link(c, "ライセンスの全文を見る", "https://github.com/otnc/Volm/blob/main/THIRD_PARTY_NOTICES.md").Margin(4, 0, 0, 0)
 }
 
-// thirdParty matches THIRD_PARTY_NOTICES.md, which tools/gennotices writes.
+// thirdParty matches THIRD_PARTY_NOTICES.md, which tools/gennotices writes. Names and SPDX license expressions stay as their projects write them.
 var thirdParty = []struct{ name, license string }{
 	{"MyGo", "MIT"},
 	{"purego", "Apache-2.0"},
 	{"go-ole", "MIT"},
-	{"go-text/typesetting", "Unlicense または BSD-3-Clause"},
+	{"go-text/typesetting", "Unlicense OR BSD-3-Clause"},
 	{"go-wca", "MIT"},
-	{"golang.org/x/image、net、sys、text", "BSD-3-Clause"},
-	{"Go 標準ライブラリ", "BSD-3-Clause"},
-	{"Material Symbols (アイコン)", "Apache-2.0"},
+	{"golang.org/x/image", "BSD-3-Clause"},
+	{"golang.org/x/net", "BSD-3-Clause"},
+	{"golang.org/x/sys", "BSD-3-Clause"},
+	{"golang.org/x/text", "BSD-3-Clause"},
+	{"Go standard library", "BSD-3-Clause"},
+	{"Material Symbols", "Apache-2.0"},
 }
 
 // The images are drawn by tools/genicons; the logo at twice the size shown.

@@ -331,7 +331,20 @@ Volm は GPL-3.0 で配布する。リポジトリの `LICENSE` に GPL-3.0 の�
 
 将来の GPL の版での利用は認めず、GPL-3.0-only とする (2026-11-26 に決定)。
 
-実行ファイルに入るモジュール (MyGo、purego、go-ole、go-text/typesetting、go-wca、golang.org/x/image、net、sys、text) と Go の標準ライブラリ、設定画面のアイコンに使う Material Symbols のライセンスは、MIT、BSD-3-Clause、Apache-2.0、Unlicense のいずれかで、GPL-3.0 と組み合わせて配布できる。各ライセンスの全文は `tools/gennotices` が `THIRD_PARTY_NOTICES.md` に書き出す。このファイルはインストーラーにも含め、設定画面の「情報」ページからリンクする。
+実行ファイルに入るモジュールと Go の標準ライブラリ、設定画面のアイコンに使う Material Symbols のライセンスは、次のとおりである。どれも GPL-3.0-only と組み合わせて配布できる。
+
+| 名前 | ライセンス (SPDX) |
+|---|---|
+| MyGo | MIT |
+| purego | Apache-2.0 |
+| go-ole | MIT |
+| go-text/typesetting | Unlicense OR BSD-3-Clause |
+| go-wca | MIT |
+| golang.org/x/image、golang.org/x/net、golang.org/x/sys、golang.org/x/text | BSD-3-Clause |
+| Go standard library | BSD-3-Clause |
+| Material Symbols | Apache-2.0 |
+
+各ライセンスの全文は `tools/gennotices` が `THIRD_PARTY_NOTICES.md` に書き出す。このファイルはインストーラーにも含め、設定画面の「情報」ページからリンクする。
 
 ## 6. 非機能要件
 
