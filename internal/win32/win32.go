@@ -232,11 +232,23 @@ func RootClass(hwnd uintptr) string {
 	return windows.UTF16ToString(buf[:n])
 }
 
+// InputMarker is the dwExtraInfo of every input Volm sends, by which its own hooks let that input pass: "Volm" in ASCII.
+const InputMarker = 0x566F6C6D
+
 // SendMaskKey presses and releases VK_NONAME. Send it while Alt or Win is held, after consuming an input that used it: otherwise the foreground app sees a lone Alt and focuses its menu bar, or Windows opens the Start menu on the lone Win.
 func SendMaskKey() {
 	keys := [2]KeybdInput{
-		{Type: INPUT_KEYBOARD, Vk: VK_NONAME},
-		{Type: INPUT_KEYBOARD, Vk: VK_NONAME, Flags: KEYEVENTF_KEYUP},
+		{Type: INPUT_KEYBOARD, Vk: VK_NONAME, ExtraInfo: InputMarker},
+		{Type: INPUT_KEYBOARD, Vk: VK_NONAME, Flags: KEYEVENTF_KEYUP, ExtraInfo: InputMarker},
+	}
+	ProcSendInput.Call(uintptr(len(keys)), uintptr(unsafe.Pointer(&keys[0])), unsafe.Sizeof(keys[0]))
+}
+
+// SendKeyPress presses and releases a key, as the media keys of a keyboard do.
+func SendKeyPress(vk uint16) {
+	keys := [2]KeybdInput{
+		{Type: INPUT_KEYBOARD, Vk: vk, ExtraInfo: InputMarker},
+		{Type: INPUT_KEYBOARD, Vk: vk, Flags: KEYEVENTF_KEYUP, ExtraInfo: InputMarker},
 	}
 	ProcSendInput.Call(uintptr(len(keys)), uintptr(unsafe.Pointer(&keys[0])), unsafe.Sizeof(keys[0]))
 }
