@@ -51,6 +51,8 @@ type Volume struct {
 	UnmuteOnIncrease bool `json:"unmuteOnIncrease"`
 	MiddleClickMute  bool `json:"middleClickMute"`
 	AppVolumeWithAlt bool `json:"appVolumeWithAlt"`
+	// AppVolumeOnTitleBar lets Alt+wheel over a window's title bar, or a browser's tabs, change that app's volume.
+	AppVolumeOnTitleBar bool `json:"appVolumeOnTitleBar"`
 }
 
 // Brightness holds the settings of Ctrl+wheel on the taskbar.
@@ -89,11 +91,12 @@ func Default() Config {
 	return Config{
 		Version: CurrentVersion,
 		Volume: Volume{
-			WheelEnabled:     true,
-			Step:             2,
-			UnmuteOnIncrease: true,
-			MiddleClickMute:  true,
-			AppVolumeWithAlt: true,
+			WheelEnabled:        true,
+			Step:                2,
+			UnmuteOnIncrease:    true,
+			MiddleClickMute:     true,
+			AppVolumeWithAlt:    true,
+			AppVolumeOnTitleBar: true,
 		},
 		Brightness: Brightness{WheelEnabled: true, Step: 5, SoftDimMin: 20, Monitors: map[string]Monitor{}},
 		OSD:        OSD{Enabled: true, Position: PositionBottomRight, DurationMs: 1500},

@@ -111,12 +111,16 @@ func (a *app) stop() {
 
 // takes runs inside the mouse hook callback and must return at once. Alt with the wheel is left to other apps until per-app volume takes it.
 func (a *app) takes(ev hook.Event) bool {
-	if !ev.OnTaskbar {
+	if !ev.OnTaskbar && !(ev.OnTitleBar && ev.Kind == hook.Wheel) {
 		return false
 	}
 	cfg := a.cfg.Load()
 	switch ev.Kind {
 	case hook.Wheel:
+		if ev.OnTitleBar {
+			// Over a title bar only Alt+wheel is Volm's: a plain wheel there switches a browser's tabs.
+			return ev.Alt && !ev.Ctrl && cfg.Volume.AppVolumeOnTitleBar && a.taskbar != nil
+		}
 		switch {
 		case ev.Alt:
 			return cfg.Volume.AppVolumeWithAlt && a.taskbar != nil
@@ -149,7 +153,7 @@ func (a *app) handleInput() {
 				// Alt is still held; without this, the foreground app focuses its menu bar when it is released.
 				win32.SendMaskKey()
 				if n := appNotches.Add(ev.Delta); n != 0 {
-					a.stepAppVolume(n, ev.Pos, &apps)
+					a.stepAppVolume(n, ev, &apps)
 				}
 			} else if ev.Ctrl {
 				if n := brightnessNotches.Add(ev.Delta); n != 0 {
@@ -361,10 +365,21 @@ type appCache struct {
 
 const appCacheLifetime = 2 * time.Second
 
-// stepAppVolume changes the volume of the app whose taskbar button is under the cursor. Over anything else on the taskbar it does nothing.
-func (a *app) stepAppVolume(notches int, at win32.Point, cache *appCache) {
-	button, ok, err := a.taskbar.ButtonAt(at)
-	if err != nil || !ok {
+// stepAppVolume changes the volume of the app whose taskbar button, or window title bar, is under the cursor. Over anything else on the taskbar it does nothing.
+func (a *app) stepAppVolume(notches int, ev hook.Event, cache *appCache) {
+	at := ev.Pos
+	var button taskbar.Button
+	var err error
+	if ev.OnTitleBar {
+		button, err = a.taskbar.WindowButton(ev.Window)
+	} else {
+		var ok bool
+		button, ok, err = a.taskbar.ButtonAt(at)
+		if !ok {
+			return
+		}
+	}
+	if err != nil || button.AUMID == "" {
 		return
 	}
 	if button.AUMID != cache.button.AUMID || time.Since(cache.found) > appCacheLifetime {

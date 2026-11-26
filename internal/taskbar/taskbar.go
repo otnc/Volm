@@ -149,6 +149,23 @@ func (f *Finder) Target(b Button) (t appid.Target, err error) {
 	return t, err
 }
 
+// WindowButton returns the app of a top-level window as a Button, for changing its volume from its title bar: the window's AUMID, else its packaged app's, else its executable's path, and the app's name from the window's title.
+func (f *Finder) WindowButton(hwnd uintptr) (b Button, err error) {
+	err = f.do(func() {
+		exe, packaged := appid.ProcessIdentity(win32.WindowProcess(hwnd))
+		b = Button{AUMID: cmp.Or(windowAUMID(hwnd), packaged, exe), Name: TitleAppName(win32.WindowTitle(hwnd))}
+	})
+	return b, err
+}
+
+// TitleAppName takes the app's name from a window title, which most apps end with " - " and their name, as in "YouTube - Brave".
+func TitleAppName(title string) string {
+	if _, app, ok := strings.CutLast(title, " - "); ok && app != "" {
+		return app
+	}
+	return title
+}
+
 // AppName cuts what the taskbar adds to an app's name for screen readers: the count of windows after " - ", and the state at the end, as in "Brave - 1 個の実行中ウィンドウ 固定済み".
 func AppName(buttonName string) string {
 	name, _, _ := strings.Cut(buttonName, " - ")

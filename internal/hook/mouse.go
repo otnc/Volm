@@ -26,8 +26,11 @@ type Event struct {
 	// Delta is the wheel delta: 120 per notch of a standard wheel, positive when rolled away from the user. Zero for MiddleClick.
 	Delta int
 	// Pos is the cursor position in physical pixels.
-	Pos              win32.Point
-	OnTaskbar        bool
+	Pos       win32.Point
+	OnTaskbar bool
+	// OnTitleBar is set when Pos is in the title bar band of an ordinary window (see win32.OnTitleBar), whose top-level window is Window.
+	OnTitleBar       bool
+	Window           uintptr
 	Ctrl, Shift, Alt bool
 }
 
@@ -104,7 +107,10 @@ func (h *mouseHook) handleMessage(message uintptr, info *win32.MSLLHookStruct) b
 		return false
 	}
 	ev.Pos = info.Pt
-	ev.OnTaskbar = h.taskbar.isTaskbarAt(info.Pt)
+	ev.OnTaskbar, ev.Window = h.taskbar.at(info.Pt)
+	if !ev.OnTaskbar && ev.Window != 0 {
+		ev.OnTitleBar = win32.OnTitleBar(ev.Window, info.Pt)
+	}
 	ev.Ctrl = win32.KeyDown(win32.VK_CONTROL)
 	ev.Shift = win32.KeyDown(win32.VK_SHIFT)
 	ev.Alt = win32.KeyDown(win32.VK_MENU)
@@ -124,17 +130,20 @@ func (h *mouseHook) handleMessage(message uintptr, info *win32.MSLLHookStruct) b
 // taskbarCache remembers the answer for the last window under the cursor. Asking for the root window's class costs up to about 1ms, and a wheel sends many events in a row over the same window.
 type taskbarCache struct {
 	hwnd      uintptr
+	root      uintptr
 	isTaskbar bool
 }
 
-func (c *taskbarCache) isTaskbarAt(pt win32.Point) bool {
+// at reports whether pt is on a taskbar, and the top-level window under pt.
+func (c *taskbarCache) at(pt win32.Point) (isTaskbar bool, root uintptr) {
 	hwnd := win32.WindowAt(pt)
 	if hwnd != 0 && hwnd == c.hwnd {
-		return c.isTaskbar
+		return c.isTaskbar, c.root
 	}
 	c.hwnd = hwnd
+	c.root = win32.Root(hwnd)
 	c.isTaskbar = IsTaskbarClass(win32.RootClass(hwnd))
-	return c.isTaskbar
+	return c.isTaskbar, c.root
 }
 
 // IsTaskbarClass reports whether a top-level window class is a taskbar: Shell_TrayWnd on the main monitor, Shell_SecondaryTrayWnd on the others. The notification area and the clock belong to them.

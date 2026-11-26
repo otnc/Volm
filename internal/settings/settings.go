@@ -320,6 +320,14 @@ func (w *window) volumePage(c *ui.Context) {
 			w.cfg.Volume.AppVolumeWithAlt = def.Volume.AppVolumeWithAlt
 		})
 	})
+	row(c, w.icons.titleBar, "ウィンドウのタイトルバーでもアプリの音量を変える", "ウィンドウのタイトルバーやブラウザーのタブの上で Alt を押しながら回すと、そのアプリの音量が変わります。", func() {
+		if ui.Switch(c, &w.cfg.Volume.AppVolumeOnTitleBar).Label("ウィンドウのタイトルバーでもアプリの音量を変える").Changed() {
+			w.save()
+		}
+		w.resetButton(c, "ウィンドウのタイトルバーでもアプリの音量を変える", w.cfg.Volume.AppVolumeOnTitleBar == def.Volume.AppVolumeOnTitleBar, func() {
+			w.cfg.Volume.AppVolumeOnTitleBar = def.Volume.AppVolumeOnTitleBar
+		})
+	})
 }
 
 func (w *window) osdPage(c *ui.Context) {
@@ -417,7 +425,7 @@ var iconFiles embed.FS
 
 type icons struct {
 	tune, volumeUp, volumeOff, osd, info, restart, mouse,
-	timer, position, visibility, code, gavel, person, login, restartApp, quit, apps,
+	timer, position, visibility, code, gavel, person, login, restartApp, quit, apps, titleBar,
 	brightness, brightnessLow, monitor,
 	keyboard, add, close *ui.SVG
 }
@@ -449,6 +457,7 @@ func loadIcons() icons {
 		restartApp:    svg("autorenew"),
 		quit:          svg("power_settings_new"),
 		apps:          svg("apps"),
+		titleBar:      svg("web_asset"),
 		add:           svg("add"),
 		close:         svg("close"),
 		visibility:    svg("visibility"),

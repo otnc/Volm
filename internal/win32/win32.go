@@ -54,6 +54,9 @@ var (
 	ProcEnumDisplayMonitors        = user32.NewProc("EnumDisplayMonitors")
 	ProcEnumDisplayDevicesW        = user32.NewProc("EnumDisplayDevicesW")
 	ProcGetDpiForWindow            = user32.NewProc("GetDpiForWindow")
+	ProcGetWindowRect              = user32.NewProc("GetWindowRect")
+	ProcGetWindowTextW             = user32.NewProc("GetWindowTextW")
+	ProcGetWindowThreadProcessID   = user32.NewProc("GetWindowThreadProcessId")
 	ProcSetForegroundWindow        = user32.NewProc("SetForegroundWindow")
 	ProcIsIconic                   = user32.NewProc("IsIconic")
 
@@ -219,6 +222,50 @@ func KeyDown(vk uintptr) bool {
 func WindowAt(pt Point) uintptr {
 	hwnd, _, _ := ProcWindowFromPoint.Call(pt.Packed())
 	return hwnd
+}
+
+// Root returns hwnd's top-level window.
+func Root(hwnd uintptr) uintptr {
+	if hwnd == 0 {
+		return 0
+	}
+	root, _, _ := ProcGetAncestor.Call(hwnd, GA_ROOT)
+	return root
+}
+
+// TitleBarHeight is how far below the top of a window the title bar, or a browser's strip of tabs drawn in its place, reaches at 96 DPI.
+const TitleBarHeight = 44
+
+// OnTitleBar reports whether pt lies in the title bar band of the top-level window root: within TitleBarHeight, scaled to the window's DPI, of its top edge. It asks nothing of the window's process, so it is safe in a hook callback.
+func OnTitleBar(root uintptr, pt Point) bool {
+	var r Rect
+	if ok, _, _ := ProcGetWindowRect.Call(root, uintptr(unsafe.Pointer(&r))); ok == 0 {
+		return false
+	}
+	dpi, _, _ := ProcGetDpiForWindow.Call(root)
+	if dpi == 0 {
+		dpi = 96
+	}
+	// A maximized window's frame sits above the screen, so measure from the top of what shows of it at least.
+	top := r.Top
+	if top < 0 {
+		top = 0
+	}
+	return pt.X >= r.Left && pt.X < r.Right && pt.Y >= top && pt.Y < top+int32(TitleBarHeight*dpi/96)
+}
+
+// WindowTitle returns the text of a window's title bar.
+func WindowTitle(hwnd uintptr) string {
+	var buf [256]uint16
+	n, _, _ := ProcGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+	return windows.UTF16ToString(buf[:n])
+}
+
+// WindowProcess returns the ID of the process that owns a window.
+func WindowProcess(hwnd uintptr) uint32 {
+	var pid uint32
+	ProcGetWindowThreadProcessID.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+	return pid
 }
 
 // RootClass returns the window class of hwnd's top-level window.
