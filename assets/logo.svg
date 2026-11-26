@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 149.64296370891057 48" width="598.5718548356423" height="192">
+  <rect x="2" y="2" width="44" height="44" rx="11" fill="#3f3cbb"/>
+  <path d="M14.101 31.899A14 14 0 1 1 33.899 31.899" fill="none" stroke-width="4" stroke-linecap="round" stroke="#ffffff" stroke-opacity="0.28"/>
+  <path d="M14.101 31.899A14 14 0 1 1 33.899 31.899" fill="none" stroke-width="4" stroke-linecap="round" stroke="#ffb21e"/>
+  <circle cx="24" cy="22" r="7" fill="#ffffff"/>
+  <line x1="25.414" y1="23.414" x2="27.182" y2="25.182" stroke-width="3" stroke-linecap="round" stroke="#3f3cbb"/>
+  <rect x="18.5" y="35" width="3" height="4" rx="0.8" fill="#ffffff"/>
+  <polygon points="21,35 24.5,32.5 24.5,41.5 21,39" fill="#ffffff"/>
+  <path d="M26.975 34.525A3.5 3.5 0 0 1 26.975 39.475" fill="none" stroke-width="1.6" stroke-linecap="round" stroke="#ffffff"/>
+  <line x1="62.500" y1="12.000" x2="71.500" y2="38.000" stroke-width="9" stroke-linecap="round" stroke="#3f3cbb"/>
+  <line x1="71.500" y1="38.000" x2="80.500" y2="12.000" stroke-width="9" stroke-linecap="round" stroke="#3f3cbb"/>
+  <path d="M88.643 38.000A8.493903345590121 8.493903345590121 0 1 1 100.655 38.000" fill="none" stroke-width="9" stroke-linecap="round" stroke="#3f3cbb"/>
+  <line x1="115.143" y1="12.000" x2="115.143" y2="38.000" stroke-width="9" stroke-linecap="round" stroke="#3f3cbb"/>
+  <line x1="127.143" y1="28.000" x2="127.143" y2="38.000" stroke-width="9" stroke-linecap="round" stroke="#3f3cbb"/>
+  <line x1="136.143" y1="28.000" x2="136.143" y2="38.000" stroke-width="9" stroke-linecap="round" stroke="#3f3cbb"/>
+  <line x1="145.143" y1="28.000" x2="145.143" y2="38.000" stroke-width="9" stroke-linecap="round" stroke="#3f3cbb"/>
+  <path d="M127.143 28.000A4.5 4.5 0 0 1 136.143 28.000" fill="none" stroke-width="9" stroke-linecap="round" stroke="#3f3cbb"/>
+  <path d="M136.143 28.000A4.5 4.5 0 0 1 145.143 28.000" fill="none" stroke-width="9" stroke-linecap="round" stroke="#3f3cbb"/>
+  <line x1="62.500" y1="12.000" x2="71.500" y2="38.000" stroke-width="5" stroke-linecap="round" stroke="#ffffff"/>
+  <line x1="71.500" y1="38.000" x2="80.500" y2="12.000" stroke-width="5" stroke-linecap="round" stroke="#ffffff"/>
+  <path d="M88.643 38.000A8.493903345590121 8.493903345590121 0 1 1 100.655 38.000" fill="none" stroke-width="5" stroke-linecap="round" stroke="#ffb21e"/>
+  <line x1="115.143" y1="12.000" x2="115.143" y2="38.000" stroke-width="5" stroke-linecap="round" stroke="#ffffff"/>
+  <line x1="127.143" y1="28.000" x2="127.143" y2="38.000" stroke-width="5" stroke-linecap="round" stroke="#ffffff"/>
+  <line x1="136.143" y1="28.000" x2="136.143" y2="38.000" stroke-width="5" stroke-linecap="round" stroke="#ffffff"/>
+  <line x1="145.143" y1="28.000" x2="145.143" y2="38.000" stroke-width="5" stroke-linecap="round" stroke="#ffffff"/>
+  <path d="M127.143 28.000A4.5 4.5 0 0 1 136.143 28.000" fill="none" stroke-width="5" stroke-linecap="round" stroke="#ffffff"/>
+  <path d="M136.143 28.000A4.5 4.5 0 0 1 145.143 28.000" fill="none" stroke-width="5" stroke-linecap="round" stroke="#ffffff"/>
+  <circle cx="94.64906036332044" cy="31.99390334559012" r="2.25" fill="#3f3cbb"/>
+</svg>
