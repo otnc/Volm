@@ -106,7 +106,7 @@ HMONITOR と WMI のインスタンスは、`EnumDisplayDevices` に `EDD_GET_DE
 - フォーカスを奪わず、クリックを透過し、タスクバーに出さない
 - テーマ: Windows のライト/ダークに合わせる
 
-OSD は MyGo の Panel ウィンドウ (`Panel`、`Frameless`、`Transparent`、`IgnoreMouseEvents`、`ShowInactive`) で作る。起動時に 1 つ作って隠しておき、表示のたびに位置と内容だけを変える。
+OSD は MyGo のウィンドウではなく、Win32 のレイヤードウィンドウに GDI で描いて作る。MyGo の小さなウィンドウ (`Panel`、`Frameless`、`Transparent`) を 1 つ作って隠しておくだけで、常駐プロセスのワーキングセットが 20MB から 91MB に増えたためである (2026-11-26 に計測)。OSD のウィンドウは専用のスレッドで起動時に 1 つ作って隠しておき、表示のたびに位置と内容だけを変える。角は DWM で丸め、フェードアウトはウィンドウ全体の不透明度で行う。
 
 ### 2.7 ホットキー
 
@@ -153,13 +153,39 @@ MyGo のネイティブ UI で作る。タブで次の項目を分ける。設�
 | 更新 | 現在のバージョン、「更新を確認」ボタン、起動時に確認する、プレリリースも対象にする |
 | 情報 | バージョン、作者 (otoneko.)、ライセンス (GPL-3.0)、使っているライブラリのライセンス |
 
+画面は、左に項目のアイコン付きのページ一覧、右に設定項目のカードを並べる。各カードには Material Symbols (Rounded) のアイコン、項目名、1 行の説明、操作部品を置く。項目のアイコンは Volm のアイコンのタイルと同じ藍色にし、スイッチなどの操作部品は Windows のアクセントカラーに従う。2026-11-26 の時点で実装したのは「一般」「音量」「OSD」「情報」の 4 ページで、「明るさ」「ホットキー」「更新」のページは、それぞれの機能と一緒に足す。
+
 ホットキーの入力欄では、フォーカス中に押したキーの組み合わせをそのまま記録する。すでに別のアクションに割り当てたキーを入力したら、どのアクションと重複しているかを表示し、上書きするかを確認する。
 
 画面の下部に「初期値に戻す」ボタンを置く。押すと確認ダイアログを出し、了承したらすべての設定 (ホットキーとモニターごとの方法を含む) を初期値に戻して保存する。「Windows 起動時に起動」も初期値 (オン) に戻し、Run の登録もそれに合わせる。
 
 設定画面は常駐するプロセスとは別のプロセス (`volm.exe --settings`) で開く。PoC 1 では、同じプロセスで設定画面を一度開くと、閉じたあとも常駐時のメモリが 20MB から 42〜52MB に増えたままになった。別のプロセスにすれば、設定画面を閉じたときにそのメモリはすべて解放される。設定画面を閉じても、常駐しているプロセスは終了しない。
 
-### 2.10 アップデート
+### 2.10 アイコンとロゴ
+
+アイコンとロゴは `tools/genicons` が Go のコードで描いて書き出す。画像の元ファイルは持たず、図形の一覧 (`tools/genicons/art.go`) から SVG と PNG の両方を作るので、2 つの見た目は一致する。絵を変えるときはこのコードを直して実行し直す。
+
+アイコンは、正面から見た音量のつまみである。Volm はホイールでこのつまみを回すアプリだ、という意味を持たせている。
+
+- 48 × 48 のグリッドに、すべての要素を同じ中心から離して置き、要素どうしを重ねない
+- 下が 90° 開いた 270° の目盛りの弧。塗った長さが音量を表す
+- 弧の内側に白いつまみ。指針は塗りの終わりを指す
+- 弧の開いた下の部分に、小さなスピーカー。このつまみが音のためのものだと示す
+- 線は端を丸め、色は単色にする。タイルは藍色 (`#3F3CBB`)、塗りは琥珀色 (`#FFB21E`)、つまみとスピーカーは白
+
+トレイアイコンは、4 つの段階すべてが同じ規則に従う。弧の塗りが 0、1/3、2/3、全部になり、指針がその端を指す。ミュートと 0% はタイルを灰色 (`#6B7280`) にし、スピーカーに × を付ける。タイルに色があるので、ライトとダークのどちらのタスクバーでも見える。
+
+ロゴは、アイコンの右に「Volm」の文字を並べたものである。文字はアイコンと同じく、太さのそろった端の丸い線で描く。文字は白で、アイコンのタイルと同じ藍色で縁取りするので、明るい背景でも暗い背景でも 1 種類のロゴで読める。「o」はアイコンの目盛りと同じく下が開いた琥珀色の弧で、真ん中につまみを表す藍色の丸を置く。「o」の上端はほかの小文字の高さに、開いた部分の端はほかの文字の下端にそろえる。文字のあいだの空きは、斜めの線の「V」も含めて、x ハイトの中ほどの高さで測ってそろえる。
+
+| 出力 | 用途 |
+|---|---|
+| `assets/icon.svg`、`assets/icon.png` (1024px) | アプリのアイコン。`mygo build` が PNG を実行ファイルのアイコンにする |
+| `assets/volm.ico` (16〜256px) | インストーラーのアイコン |
+| `assets/logo.svg` | README などのロゴ |
+| `internal/tray/icons/*.png` (32px) | トレイアイコン |
+| `internal/settings/appicon.png`、`logo.png` | 設定画面のヘッダーと「情報」ページ |
+
+### 2.11 アップデート
 
 設定画面の「更新を確認」と、起動時の自動確認 (初期値はオン、24 時間に 1 回まで) で、新しいバージョンを確認する。
 
@@ -184,8 +210,14 @@ MyGo にも自動更新 (`mygo.Updater`) があるが、NSIS のインストー�
 | アプリの枠組み | MyGo (github.com/egoist/mygo、MIT) | トレイ、ウィンドウ、ネイティブ UI、ログイン時起動、多重起動防止をまとめて扱える |
 | UI | MyGo のネイティブ UI | WebView2 に依存せず、Go だけで書ける。公式の目安でバイナリ約 7MB、メモリ約 44MB |
 | Win32 API | golang.org/x/sys/windows | cgo を使わずに呼べる。MyGo も cgo なしでビルドする |
-| COM (Core Audio、WMI、UI Automation) | go-ole、Core Audio は go-wca を候補にする | cgo なしで COM を呼べる。go-wca の保守状況は要検証で、足りないインターフェースは vtable を自前で定義する |
+| COM (Core Audio、WMI、UI Automation) | go-ole、Core Audio は go-wca v0.3.0 | cgo なしで COM を呼べる。go-wca の最終更新は 2023-03 で、足りないインターフェースや誤りのあるメソッドは vtable を自前で呼ぶ |
+| ビルド | `mygo build` (`go tool mygo`) | `mygo.json` の名前、バージョン、アイコンを実行ファイルに入れる |
 | インストーラー | Inno Setup 6 | 指定 |
+
+go-wca には、次の 2 つの問題があった。実装では該当するメソッドを使わず、vtable を直接呼ぶ。
+
+- `IAudioEndpointVolume.GetMute` と `ISimpleAudioVolume.GetMute` は、Windows が 4 バイトの `BOOL` を書き込む場所に Go の 1 バイトの `bool` を渡す。後ろの 3 バイトが上書きされ、近くの変数の値が壊れる。M1 の実装中に、音量を上げたはずが下がる現象として見つかった
+- `IAudioEndpointVolume.RegisterControlChangeNotify` は、コールバックを引数に取らない。`IAudioEndpointVolumeCallback` も定義されていないので、COM オブジェクトを自前で作る
 
 MyGo は 2026-11 時点で v0.10.0 であり、1.0 前なので API が変わりうる。`go.mod` でバージョンを固定し、更新するときは変更点を確認する。
 
@@ -201,7 +233,7 @@ Volm は常駐プロセスと設定プロセスの 2 つに分かれる。どち
 
 ```
 main goroutine (MyGo の main スレッド)
-  ├─ トレイ、OSD
+  ├─ トレイ
   └─ RunOnMain で UI を更新
 
 フックスレッド (runtime.LockOSThread で固定)
@@ -218,6 +250,9 @@ main goroutine (MyGo の main スレッド)
 
 オーバーレイスレッド (runtime.LockOSThread で固定)
   └─ ソフト減光用の Win32 レイヤードウィンドウとメッセージループ
+
+OSD スレッド (runtime.LockOSThread で固定)
+  └─ OSD の Win32 レイヤードウィンドウとメッセージループ
 ```
 
 低レベルフックのコールバックが時間内 (`LowLevelHooksTimeout`、既定で約 1 秒) に戻らないと、Windows は警告なしにフックを外す。そのため、コールバックではタスクバーの判定と修飾キーの確認 (`GetAsyncKeyState`) だけを行い、COM の呼び出しはコントローラー側で行う。
@@ -241,13 +276,12 @@ internal/config/     設定の読み書き、初期値
 internal/update/     GitHub Releases の確認、ダウンロード、インストーラー起動
 internal/media/      メディアキー送信
 installer/volm.iss   Inno Setup スクリプト
-poc/                 実装前の検証用コード (7 章)
 docs/                設計書など
 ```
 
 ### 3.4 設定ファイル
 
-`%APPDATA%\Volm\config.json` に保存する。書き込みは一時ファイルに書いてから置き換え、途中で落ちても壊れないようにする。読み込めない場合は、壊れたファイルを `config.json.bak` に退避して初期値で起動し、通知で知らせる。
+`%APPDATA%\Volm\config.json` に保存する。書き込みは一時ファイルに書いてから置き換え、途中で落ちても壊れないようにする。読み込めない場合は、壊れたファイルを `config.json.bak` に退避して初期値で起動し、通知で知らせる。MyGo は Windows の通知をトレイアイコンのバルーンで出すので、応答不可 (集中モード) がオンの間は表示されない。
 
 ```json
 {
@@ -278,6 +312,8 @@ Inno Setup 6 で作る。MyGo の `mygo build -skip-installer` で出力した�
 - `AppPublisher=otoneko.`、`LicenseFile` に GPL-3.0 の全文を指定する
 - 言語: `compiler:Languages\Japanese.isl`
 - タスク: 「Windows 起動時に起動する」(初期値オン)、「デスクトップにショートカットを作る」(初期値オフ)
+- 「Windows 起動時に起動する」は、MyGo の `SetOpenAtLogin` と同じ形で HKCU の Run に登録する。値の名前は `mygo.json` の `identifier` (`io.github.otnc.volm`)、値は `"{app}\Volm.exe" --mygo-opened-at-login` とする。形が違うと、設定画面のスイッチがオフのように見える
+- `SetupIconFile` には `assets/volm.ico` を使う
 - 実行中の Volm は、インストール前に終了させる (`AppMutex` と `CloseApplications`)
 - `[Run]` に Volm を `postinstall nowait` で置き、通常のインストールでは完了画面のチェックで、サイレントインストール (自動更新) では自動で起動する
 - アンインストール時: HKCU の Run から Volm を削除する。`%APPDATA%\Volm` を削除するかはダイアログで確認する
@@ -295,7 +331,7 @@ Volm は GPL-3.0 で配布する。リポジトリの `LICENSE` に GPL-3.0 の�
 
 将来の GPL の版での利用は認めず、GPL-3.0-only とする (2026-11-26 に決定)。
 
-依存ライブラリ (MyGo、go-ole、go-wca、x/sys) は MIT または BSD 系で、GPL-3.0 と組み合わせて配布できる。各ライセンスの全文を `THIRD_PARTY_NOTICES.md` にまとめ、インストーラーにも含め、設定画面の「情報」タブから開けるようにする。
+実行ファイルに入るモジュール (MyGo、purego、go-ole、go-text/typesetting、go-wca、golang.org/x/image、net、sys、text) と Go の標準ライブラリ、設定画面のアイコンに使う Material Symbols のライセンスは、MIT、BSD-3-Clause、Apache-2.0、Unlicense のいずれかで、GPL-3.0 と組み合わせて配布できる。各ライセンスの全文は `tools/gennotices` が `THIRD_PARTY_NOTICES.md` に書き出す。このファイルはインストーラーにも含め、設定画面の「情報」ページからリンクする。
 
 ## 6. 非機能要件
 
@@ -319,9 +355,9 @@ Volm は GPL-3.0 で配布する。リポジトリの `LICENSE` に GPL-3.0 の�
 6. `IPolicyConfig` で既定のデバイスを切り替えられるか
 7. Win+↑/↓ を低レベルキーボードフックで処理したとき、Windows のスナップ動作が起きないか
 
-PoC のコードは `poc/<名前>/` に、それぞれ独立した Go モジュールとして置く。
+PoC のコードは、結果をこの章にまとめたうえでリポジトリから削除した。コードを見返すときは、最初のコミット `a8288a5` から取り出す。
 
-### PoC 1 の結果 (2026-11-26、`poc/tray`)
+### PoC 1 の結果 (2026-11-26)
 
 MyGo v0.10.0 で、ウィンドウを開かずにトレイだけで常駐できた。Windows ではトレイアイコンの左クリックで `Tray.OnClick` が呼ばれ、右クリックで `TrayOptions.Menu` のメニューが出る。2.8 の操作はこの仕組みでそのまま作れる。`SetIcon` によるアイコンの差し替えと、2 つ目の起動を `OnSecondInstance` で受け取る処理も動いた。
 
@@ -335,7 +371,7 @@ MyGo v0.10.0 で、ウィンドウを開かずにトレイだけで常駐でき�
 
 exe の大きさは、通常のビルドで 16.9MB、`-trimpath -ldflags="-s -w"` を付けると 11.8MB だった。Explorer を再起動したときにトレイアイコンが戻るかは、まだ実機で確かめていない。
 
-### PoC 2 の結果 (2026-11-26、`poc/hook`)
+### PoC 2 の結果 (2026-11-26)
 
 Windows 11 で `WH_MOUSE_LL` のフックを登録し、ホイールと中クリックを手で操作して確かめた。メインのタスクバー (`Shell_TrayWnd`) とほかのモニターのタスクバー (`Shell_SecondaryTrayWnd`) のどちらでも、ホイールと中クリックを判定できた。コールバックから 1 を返したイベントは、タスクバーに届かなかった。Ctrl、Ctrl+Shift、Alt の状態は `GetAsyncKeyState` で取れた。Chrome のウィンドウの上のホイールはフックが渡し、いつもどおりスクロールした。
 
@@ -345,7 +381,7 @@ Alt+ホイールのイベントを捨てると、前面のアプリには Alt �
 
 コールバックの処理時間は多くが 1ms 未満で、最大 1.56ms だった。6 章の目標 (1ms 以内) を少し超えるので、本番ではルートウィンドウのクラス名を HWND ごとにキャッシュする。管理者権限のウィンドウが前面にあるとき (UIPI) の挙動は、まだ確かめていない。
 
-### PoC 3 の結果 (2026-11-26、`poc/brightness`)
+### PoC 3 の結果 (2026-11-26)
 
 内蔵パネル (SHP158C) の明るさは、go-ole から WMI の `WmiSetBrightness` で変えられた。値は 0〜100 の 101 段階である。1 回の書き込みは、インスタンスを探すクエリを含めて 11〜15ms だった。50 を書いた直後に読み返すと 55 が返った。パネルが明るさを少しずつ変えるためと考えられるので、OSD には読み返した値ではなく、書き込んだ目標値を表示する。
 
@@ -353,13 +389,13 @@ Alt+ホイールのイベントを捨てると、前面のアプリには Alt �
 
 外部の 2 台 (HP 2009、TOSHIBA LCB2005V) は、DDC/CI の `GetMonitorBrightness` と VCP 0x10 の読み取りがどちらも「システムに接続されたデバイスが機能していません」で失敗した。失敗が返るまでに 1 回あたり約 250ms かかる。起動時の調査で全モニターを順に調べると 1 秒以上かかるので、調査はコントローラーとは別の goroutine で行い、終わるまでは前回の結果を使う。内蔵パネルは DDC/CI に応答しなかった (I2C の送信エラー) が、WMI が使えるので問題ない。モニターのメニューで DDC/CI を有効にしてからの再確認はまだ行っていない。
 
-### PoC 4 の結果 (2026-11-26、`poc/overlay`)
+### PoC 4 の結果 (2026-11-26)
 
 外部の 2 台に、不透明度 128 の黒いレイヤードウィンドウ (`WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`) を重ねた。画面の色はタスクバーも含めて約半分の明るさになった (例: `1c1c1c` → `0e0e0e`)。
 
 覆いを重ねた状態でも、`WindowFromPoint` は覆いの下のウィンドウ (`Progman`、`Chrome_WidgetWin_1`、`Shell_SecondaryTrayWnd`) を返した。覆いがある間もタスクバーの判定 (2.1) はそのまま動く。全画面の動画やゲーム、HDR を有効にしたモニターでの表示は、まだ確かめていない。
 
-### PoC 5 の結果 (2026-11-26、`poc/appvolume`)
+### PoC 5 の結果 (2026-11-26)
 
 Windows 11 のタスクバーのアプリのボタンは、AutomationId が `Appid: <AUMID>` の形だった (例: `Appid: Brave`、`Appid: Claude_pzs8sxrjxfjjc!Claude`、`Appid: C:\Users\...\Spotify.exe`)。UI Automation の `ElementFromPoint` で AutomationId を取るのに、1 回あたり 2〜5ms かかった。フックのコールバックでは呼ばず、コントローラーで呼ぶ。
 
@@ -367,11 +403,11 @@ Windows 11 のタスクバーのアプリのボタンは、AutomationId が `App
 
 VLC (Win32、ほかのモニターのタスクバー) と Brave (音声は子プロセス) で、ボタンから音声セッションを特定し、音量を半分にしてから元に戻せた。パッケージアプリの音声セッションは、確かめる機会がなかった。音声 API は go-wca v0.3.0 (最終更新 2023-03) で足りた。
 
-### PoC 6 の結果 (2026-11-26、`poc/policyconfig`)
+### PoC 6 の結果 (2026-11-26)
 
 `CPolicyConfigClient` の `IPolicyConfig::SetDefaultEndpoint` (vtable の 13 番目) を eConsole、eMultimedia、eCommunications の順に呼び、既定の再生デバイスをスピーカー (Realtek) から LCB2005V に切り替えてから元に戻せた。3 つの役割の切り替えは合わせて約 100ms だった。この端末で有効な再生デバイスは、スピーカー (Realtek)、LCB2005V、HP 2009 の 3 つである。
 
-### PoC 7 の結果 (2026-11-26、`poc/hotkey`)
+### PoC 7 の結果 (2026-11-26)
 
 `WH_KEYBOARD_LL` で、Win が押されている間の ↑/↓ を押下と解放の両方とも捨てた。メモ帳を前面にして `SendInput` で Win+↑ と Win+↓ を送ると、フックがない対照の実行ではメモ帳が最大化された。フックがある実行では、メモ帳の表示状態と位置は変わらなかった。
 
