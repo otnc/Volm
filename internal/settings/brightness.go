@@ -62,6 +62,14 @@ func (w *window) brightnessPage(c *ui.Context) {
 	t := c.Theme()
 	def := config.Default()
 	pageTitle(c, "明るさ")
+	row(c, w.icons.brightness, "タスクバーのホイールで明るさを変える", "Ctrl を押しながら回します。オフにすると、ほかのアプリに渡ります。ホットキーは使えます。", func() {
+		if ui.Switch(c, &w.cfg.Brightness.WheelEnabled).Label("タスクバーのホイールで明るさを変える").Changed() {
+			w.save()
+		}
+		w.resetButton(c, "タスクバーのホイールで明るさを変える", w.cfg.Brightness.WheelEnabled == def.Brightness.WheelEnabled, func() {
+			w.cfg.Brightness.WheelEnabled = def.Brightness.WheelEnabled
+		})
+	})
 	row(c, w.icons.mouse, "ホイール 1 段で変わる明るさ", "Ctrl を押しながらタスクバーの上で回します。", func() {
 		if ui.StepSlider(c, &w.brightnessStep, config.MinStep, config.MaxStep, 1).Width(140).Label("ホイール 1 段で変わる明るさ").Changed() {
 			w.cfg.Brightness.Step = int(w.brightnessStep)

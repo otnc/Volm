@@ -8,12 +8,15 @@ import (
 	"embed"
 	"fmt"
 	"log"
+	"os"
+	"os/exec"
 	"slices"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/otnc/Volm/internal/brightness"
 	"github.com/otnc/Volm/internal/config"
+	"github.com/otnc/Volm/internal/ipc"
 )
 
 // WindowTitle is also how a second settings process finds the first one.
@@ -59,6 +62,7 @@ type window struct {
 	openAtLogin  bool
 	confirmReset bool
 	errorText    string
+	noticeText   string
 
 	icons    icons
 	appImage ui.ImageSource
@@ -150,6 +154,9 @@ func (w *window) view(c *ui.Context) {
 				if w.errorText != "" {
 					ui.Text(c, w.errorText).TextColor(t.Danger)
 				}
+				if w.noticeText != "" {
+					ui.Text(c, w.noticeText).TextColor(t.Success)
+				}
 				switch w.page {
 				case pageGeneral:
 					w.generalPage(c)
@@ -217,7 +224,7 @@ func (w *window) resetButton(c *ui.Context, title string, isDefault bool, reset 
 func (w *window) generalPage(c *ui.Context) {
 	def := config.Default()
 	pageTitle(c, "一般")
-	row(c, w.icons.power, "Windows の起動時に Volm を起動する", "サインインしたときに、Volm がトレイに常駐します。", func() {
+	row(c, w.icons.login, "Windows の起動時に Volm を起動する", "サインインしたときに、Volm がトレイに常駐します。", func() {
 		if ui.Switch(c, &w.openAtLogin).Label("Windows の起動時に Volm を起動する").Changed() {
 			w.setOpenAtLogin(w.openAtLogin)
 		}
@@ -236,11 +243,59 @@ func (w *window) generalPage(c *ui.Context) {
 			w.cfg.Volume.UnmuteOnIncrease = def.Volume.UnmuteOnIncrease
 		})
 	})
+
+	ui.Text(c, "Volm の動作").FontSize(16).Bold().Margin(12, 0, 0, 0)
+	row(c, w.icons.restartApp, "Volm を再起動する", "常駐している Volm を終了して、起動し直します。この画面は開いたままです。", func() {
+		if ui.Button(c, "再起動").Clicked() {
+			w.restartResident()
+		}
+	})
+	row(c, w.icons.quit, "Volm を終了する", "常駐している Volm とこの画面を終了します。タスクバーのホイールとホットキーは使えなくなります。", func() {
+		if ui.Button(c, "終了").Clicked() {
+			w.quitResident()
+		}
+	})
+}
+
+// restartResident asks the resident process to quit and starts a new one. MyGo's instance lock makes the new one wait until the old one has exited.
+func (w *window) restartResident() {
+	if _, err := ipc.RequestQuit(); err != nil {
+		log.Printf("settings: asking Volm to quit: %v", err)
+	}
+	exe, err := os.Executable()
+	if err == nil {
+		cmd := exec.Command(exe)
+		if err = cmd.Start(); err == nil {
+			err = cmd.Process.Release()
+		}
+	}
+	if err != nil {
+		log.Printf("settings: starting Volm: %v", err)
+		w.errorText = "Volm を起動できませんでした。" + err.Error()
+		return
+	}
+	w.noticeText = "Volm を再起動しました。"
+}
+
+// quitResident asks the resident process to quit and closes this window too.
+func (w *window) quitResident() {
+	if _, err := ipc.RequestQuit(); err != nil {
+		log.Printf("settings: asking Volm to quit: %v", err)
+	}
+	mygo.App.Quit()
 }
 
 func (w *window) volumePage(c *ui.Context) {
 	def := config.Default()
 	pageTitle(c, "音量")
+	row(c, w.icons.volumeUp, "タスクバーのホイールで音量を変える", "オフにすると、タスクバーの上のホイールはほかのアプリに渡ります。ホットキーは使えます。", func() {
+		if ui.Switch(c, &w.cfg.Volume.WheelEnabled).Label("タスクバーのホイールで音量を変える").Changed() {
+			w.save()
+		}
+		w.resetButton(c, "タスクバーのホイールで音量を変える", w.cfg.Volume.WheelEnabled == def.Volume.WheelEnabled, func() {
+			w.cfg.Volume.WheelEnabled = def.Volume.WheelEnabled
+		})
+	})
 	row(c, w.icons.mouse, "ホイール 1 段で変わる音量", "タスクバーの上で 1 段回したときの変化量です。", func() {
 		if ui.StepSlider(c, &w.volumeStep, config.MinStep, config.MaxStep, 1).Width(140).Label("ホイール 1 段で変わる音量").Changed() {
 			w.cfg.Volume.Step = int(w.volumeStep)
@@ -353,8 +408,8 @@ var (
 var iconFiles embed.FS
 
 type icons struct {
-	tune, volumeUp, volumeOff, osd, info, restart, power, mouse,
-	timer, position, visibility, code, gavel, person,
+	tune, volumeUp, volumeOff, osd, info, restart, mouse,
+	timer, position, visibility, code, gavel, person, login, restartApp, quit,
 	brightness, brightnessLow, monitor,
 	keyboard, add, close *ui.SVG
 }
@@ -375,7 +430,6 @@ func loadIcons() icons {
 		osd:           svg("branding_watermark"),
 		info:          svg("info"),
 		restart:       svg("restart_alt"),
-		power:         svg("power_settings_new"),
 		mouse:         svg("mouse"),
 		timer:         svg("timer"),
 		position:      svg("picture_in_picture_alt"),
@@ -383,6 +437,9 @@ func loadIcons() icons {
 		brightnessLow: svg("brightness_low"),
 		monitor:       svg("monitor"),
 		keyboard:      svg("keyboard"),
+		login:         svg("login"),
+		restartApp:    svg("autorenew"),
+		quit:          svg("power_settings_new"),
 		add:           svg("add"),
 		close:         svg("close"),
 		visibility:    svg("visibility"),
