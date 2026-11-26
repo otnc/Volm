@@ -23,6 +23,7 @@ const (
 	pageGeneral    = "general"
 	pageVolume     = "volume"
 	pageBrightness = "brightness"
+	pageHotkeys    = "hotkeys"
 	pageOSD        = "osd"
 	pageAbout      = "about"
 )
@@ -47,6 +48,9 @@ type window struct {
 	softDimMin     float64
 	osdSeconds     float64
 	positionLabel  string
+
+	hotkeys hotkeyEditor
+	win     *mygo.Window
 
 	displays     []brightness.Display
 	detecting    bool
@@ -76,6 +80,7 @@ func Open(path string, cfg config.Config) {
 		MinHeight: 440,
 		Content:   ui.View(w.view),
 	})
+	w.win = win
 	w.detectMonitors(win)
 }
 
@@ -131,6 +136,7 @@ func (w *window) view(c *ui.Context) {
 				ui.SidebarItem(c, pageGeneral, w.icons.tune, "一般")
 				ui.SidebarItem(c, pageVolume, w.icons.volumeUp, "音量")
 				ui.SidebarItem(c, pageBrightness, w.icons.brightness, "明るさ")
+				ui.SidebarItem(c, pageHotkeys, w.icons.keyboard, "ホットキー")
 				ui.SidebarItem(c, pageOSD, w.icons.osd, "OSD (画面表示)")
 				ui.SidebarItem(c, pageAbout, w.icons.info, "情報")
 			}).Grow(1)
@@ -151,6 +157,8 @@ func (w *window) view(c *ui.Context) {
 					w.volumePage(c)
 				case pageBrightness:
 					w.brightnessPage(c)
+				case pageHotkeys:
+					w.hotkeysPage(c)
 				case pageOSD:
 					w.osdPage(c)
 				case pageAbout:
@@ -161,7 +169,7 @@ func (w *window) view(c *ui.Context) {
 	})
 	if ui.AlertDialog(c, &w.confirmReset,
 		"すべての設定を初期値に戻しますか？",
-		"音量や OSD の設定がすべて初期値になり、Windows の起動時に起動する設定もオンになります。この操作は取り消せません。",
+		"音量、明るさ、ホットキー、OSD の設定がすべて初期値になり、Windows の起動時に起動する設定もオンになります。この操作は取り消せません。",
 		"キャンセル", "初期値に戻す") == 1 {
 		w.reset()
 	}
@@ -316,7 +324,8 @@ var iconFiles embed.FS
 type icons struct {
 	tune, volumeUp, volumeOff, osd, info, restart, power, mouse,
 	timer, position, visibility, code, gavel, person,
-	brightness, brightnessLow, monitor *ui.SVG
+	brightness, brightnessLow, monitor,
+	keyboard, add, close *ui.SVG
 }
 
 // loadIcons parses the Material Symbols (Rounded) icons in icons/.
@@ -342,6 +351,9 @@ func loadIcons() icons {
 		brightness:    svg("light_mode"),
 		brightnessLow: svg("brightness_low"),
 		monitor:       svg("monitor"),
+		keyboard:      svg("keyboard"),
+		add:           svg("add"),
+		close:         svg("close"),
 		visibility:    svg("visibility"),
 		code:          svg("code"),
 		gavel:         svg("gavel"),
