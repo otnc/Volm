@@ -72,7 +72,7 @@ func (w *window) installUpdate() {
 			log.Printf("settings: installing update: %v", err)
 			w.win.Update(func() {
 				w.updates.busy = false
-				w.updates.message = "更新できませんでした。" + err.Error()
+				w.updates.message = "更新できませんでした。時間をおいて、もう一度試してください。(" + err.Error() + ")"
 			})
 			return
 		}

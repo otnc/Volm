@@ -105,7 +105,7 @@ func (w *window) load(cfg config.Config) {
 func (w *window) save() {
 	if err := config.Save(w.path, w.cfg); err != nil {
 		log.Printf("settings: saving: %v", err)
-		w.errorText = "設定を保存できませんでした。" + err.Error()
+		w.errorText = "設定を保存できませんでした。%APPDATA%\\Volm に書き込めるか確かめてください。(" + err.Error() + ")"
 		return
 	}
 	w.errorText = ""
@@ -114,7 +114,7 @@ func (w *window) save() {
 func (w *window) setOpenAtLogin(on bool) {
 	if err := mygo.App.SetOpenAtLogin(on); err != nil {
 		log.Printf("settings: open at login: %v", err)
-		w.errorText = "Windows の起動時に起動する設定を変更できませんでした。" + err.Error()
+		w.errorText = "Windows の起動時に起動する設定を変更できませんでした。Windows の設定の「アプリ」→「スタートアップ」でも変更できます。(" + err.Error() + ")"
 	}
 	w.openAtLogin = mygo.App.OpenAtLogin()
 }
@@ -216,7 +216,7 @@ func row(c *ui.Context, icon *ui.SVG, title, description string, control func())
 
 // resetButton is the icon button at the end of a setting that puts that setting alone back to its initial value, without asking: it is easy to change again. It is disabled while the setting already has its initial value.
 func (w *window) resetButton(c *ui.Context, title string, isDefault bool, reset func()) {
-	if ui.Button(c, "").Label(title + " を初期値に戻す").Tooltip("初期値に戻す").Disabled(isDefault).Padding(6).Children(func() {
+	if ui.Button(c, "").Label("「" + title + "」を初期値に戻す").Tooltip("初期値に戻す").Disabled(isDefault).Padding(6).Children(func() {
 		ui.Icon(c, w.icons.restart).FontSize(18)
 	}).Clicked() {
 		reset()
@@ -234,7 +234,7 @@ func (w *window) generalPage(c *ui.Context) {
 			w.setOpenAtLogin(w.openAtLogin)
 		}
 		// Starting at login is not in the settings file: its initial value is on, as the installer sets it.
-		if ui.Button(c, "").Label("Windows の起動時に Volm を起動する を初期値に戻す").Tooltip("初期値に戻す").Disabled(w.openAtLogin).Padding(6).Children(func() {
+		if ui.Button(c, "").Label("「Windows の起動時に Volm を起動する」を初期値に戻す").Tooltip("初期値に戻す").Disabled(w.openAtLogin).Padding(6).Children(func() {
 			ui.Icon(c, w.icons.restart).FontSize(18)
 		}).Clicked() {
 			w.setOpenAtLogin(true)
@@ -338,11 +338,11 @@ func (w *window) volumePage(c *ui.Context) {
 func (w *window) osdPage(c *ui.Context) {
 	def := config.Default()
 	pageTitle(c, "OSD (画面表示)")
-	row(c, w.icons.visibility, "音量を変えたときに OSD を表示する", "操作したモニターに、音量とデバイス名を少しのあいだ表示します。", func() {
-		if ui.Switch(c, &w.cfg.OSD.Enabled).Label("音量を変えたときに OSD を表示する").Changed() {
+	row(c, w.icons.visibility, "音量や明るさを変えたときに OSD を表示する", "操作したモニターに、変えた値と対象の名前を少しのあいだ表示します。", func() {
+		if ui.Switch(c, &w.cfg.OSD.Enabled).Label("音量や明るさを変えたときに OSD を表示する").Changed() {
 			w.save()
 		}
-		w.resetButton(c, "音量を変えたときに OSD を表示する", w.cfg.OSD.Enabled == def.OSD.Enabled, func() { w.cfg.OSD.Enabled = def.OSD.Enabled })
+		w.resetButton(c, "音量や明るさを変えたときに OSD を表示する", w.cfg.OSD.Enabled == def.OSD.Enabled, func() { w.cfg.OSD.Enabled = def.OSD.Enabled })
 	})
 	row(c, w.icons.position, "表示する位置", "操作したモニターの中での位置です。", func() {
 		labels := make([]string, len(positions))
