@@ -202,21 +202,44 @@ func row(c *ui.Context, icon *ui.SVG, title, description string, control func())
 	})
 }
 
+// resetButton is the icon button at the end of a setting that puts that setting alone back to its initial value, without asking: it is easy to change again. It is disabled while the setting already has its initial value.
+func (w *window) resetButton(c *ui.Context, title string, isDefault bool, reset func()) {
+	if ui.Button(c, "").Label(title + " を初期値に戻す").Tooltip("初期値に戻す").Disabled(isDefault).Padding(6).Children(func() {
+		ui.Icon(c, w.icons.restart).FontSize(18)
+	}).Clicked() {
+		reset()
+		// Bring the widgets' mirrors of the settings in line with the reset value.
+		w.load(w.cfg)
+		w.save()
+	}
+}
+
 func (w *window) generalPage(c *ui.Context) {
+	def := config.Default()
 	pageTitle(c, "一般")
 	row(c, w.icons.power, "Windows の起動時に Volm を起動する", "サインインしたときに、Volm がトレイに常駐します。", func() {
 		if ui.Switch(c, &w.openAtLogin).Label("Windows の起動時に Volm を起動する").Changed() {
 			w.setOpenAtLogin(w.openAtLogin)
+		}
+		// Starting at login is not in the settings file: its initial value is on, as the installer sets it.
+		if ui.Button(c, "").Label("Windows の起動時に Volm を起動する を初期値に戻す").Tooltip("初期値に戻す").Disabled(w.openAtLogin).Padding(6).Children(func() {
+			ui.Icon(c, w.icons.restart).FontSize(18)
+		}).Clicked() {
+			w.setOpenAtLogin(true)
 		}
 	})
 	row(c, w.icons.volumeUp, "音量を上げたらミュートを解除する", "ミュート中にホイールで音量を上げると、ミュートも解除します。", func() {
 		if ui.Switch(c, &w.cfg.Volume.UnmuteOnIncrease).Label("音量を上げたらミュートを解除する").Changed() {
 			w.save()
 		}
+		w.resetButton(c, "音量を上げたらミュートを解除する", w.cfg.Volume.UnmuteOnIncrease == def.Volume.UnmuteOnIncrease, func() {
+			w.cfg.Volume.UnmuteOnIncrease = def.Volume.UnmuteOnIncrease
+		})
 	})
 }
 
 func (w *window) volumePage(c *ui.Context) {
+	def := config.Default()
 	pageTitle(c, "音量")
 	row(c, w.icons.mouse, "ホイール 1 段で変わる音量", "タスクバーの上で 1 段回したときの変化量です。", func() {
 		if ui.StepSlider(c, &w.volumeStep, config.MinStep, config.MaxStep, 1).Width(140).Label("ホイール 1 段で変わる音量").Changed() {
@@ -224,20 +247,26 @@ func (w *window) volumePage(c *ui.Context) {
 			w.save()
 		}
 		ui.Text(c, fmt.Sprintf("%d%%", int(w.volumeStep))).Width(44).TextAlign(ui.End)
+		w.resetButton(c, "ホイール 1 段で変わる音量", w.cfg.Volume.Step == def.Volume.Step, func() { w.cfg.Volume.Step = def.Volume.Step })
 	})
 	row(c, w.icons.volumeOff, "中クリックでミュートを切り替える", "タスクバーの上でホイールを押し込むと、ミュートをオンまたはオフにします。", func() {
 		if ui.Switch(c, &w.cfg.Volume.MiddleClickMute).Label("中クリックでミュートを切り替える").Changed() {
 			w.save()
 		}
+		w.resetButton(c, "中クリックでミュートを切り替える", w.cfg.Volume.MiddleClickMute == def.Volume.MiddleClickMute, func() {
+			w.cfg.Volume.MiddleClickMute = def.Volume.MiddleClickMute
+		})
 	})
 }
 
 func (w *window) osdPage(c *ui.Context) {
+	def := config.Default()
 	pageTitle(c, "OSD (画面表示)")
 	row(c, w.icons.visibility, "音量を変えたときに OSD を表示する", "操作したモニターに、音量とデバイス名を少しのあいだ表示します。", func() {
 		if ui.Switch(c, &w.cfg.OSD.Enabled).Label("音量を変えたときに OSD を表示する").Changed() {
 			w.save()
 		}
+		w.resetButton(c, "音量を変えたときに OSD を表示する", w.cfg.OSD.Enabled == def.OSD.Enabled, func() { w.cfg.OSD.Enabled = def.OSD.Enabled })
 	})
 	row(c, w.icons.position, "表示する位置", "操作したモニターの中での位置です。", func() {
 		labels := make([]string, len(positions))
@@ -252,6 +281,7 @@ func (w *window) osdPage(c *ui.Context) {
 			}
 			w.save()
 		}
+		w.resetButton(c, "表示する位置", w.cfg.OSD.Position == def.OSD.Position, func() { w.cfg.OSD.Position = def.OSD.Position })
 	})
 	row(c, w.icons.timer, "表示する時間", "最後の操作から消え始めるまでの時間です。", func() {
 		if ui.StepSlider(c, &w.osdSeconds, 0.5, 5, 0.5).Width(140).Label("表示する時間").Changed() {
@@ -259,6 +289,7 @@ func (w *window) osdPage(c *ui.Context) {
 			w.save()
 		}
 		ui.Text(c, fmt.Sprintf("%.1f 秒", w.osdSeconds)).Width(52).TextAlign(ui.End)
+		w.resetButton(c, "表示する時間", w.cfg.OSD.DurationMs == def.OSD.DurationMs, func() { w.cfg.OSD.DurationMs = def.OSD.DurationMs })
 	})
 }
 

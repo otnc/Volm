@@ -60,6 +60,7 @@ func (w *window) detectMonitors(win *mygo.Window) {
 
 func (w *window) brightnessPage(c *ui.Context) {
 	t := c.Theme()
+	def := config.Default()
 	pageTitle(c, "明るさ")
 	row(c, w.icons.mouse, "ホイール 1 段で変わる明るさ", "Ctrl を押しながらタスクバーの上で回します。", func() {
 		if ui.StepSlider(c, &w.brightnessStep, config.MinStep, config.MaxStep, 1).Width(140).Label("ホイール 1 段で変わる明るさ").Changed() {
@@ -67,6 +68,7 @@ func (w *window) brightnessPage(c *ui.Context) {
 			w.save()
 		}
 		ui.Text(c, fmt.Sprintf("%d%%", int(w.brightnessStep))).Width(44).TextAlign(ui.End)
+		w.resetButton(c, "ホイール 1 段で変わる明るさ", w.cfg.Brightness.Step == def.Brightness.Step, func() { w.cfg.Brightness.Step = def.Brightness.Step })
 	})
 	row(c, w.icons.brightnessLow, "暗く重ねるときの下限", "画面を暗く重ねる方法で、これより暗くしません。", func() {
 		if ui.StepSlider(c, &w.softDimMin, 5, 100, 5).Width(140).Label("暗く重ねるときの下限").Changed() {
@@ -74,6 +76,9 @@ func (w *window) brightnessPage(c *ui.Context) {
 			w.save()
 		}
 		ui.Text(c, fmt.Sprintf("%d%%", int(w.softDimMin))).Width(44).TextAlign(ui.End)
+		w.resetButton(c, "暗く重ねるときの下限", w.cfg.Brightness.SoftDimMin == def.Brightness.SoftDimMin, func() {
+			w.cfg.Brightness.SoftDimMin = def.Brightness.SoftDimMin
+		})
 	})
 
 	ui.Text(c, "モニターごとの方法").FontSize(16).Bold().Margin(12, 0, 0, 0)
@@ -101,6 +106,11 @@ func (w *window) brightnessPage(c *ui.Context) {
 				w.methodChoice[d.ID] = choice
 				w.setMonitorMethod(d.ID, choice)
 			}
+			auto := methodLabel(brightness.MethodAuto)
+			w.resetButton(c, d.Name+" の明るさを変える方法", choice == auto, func() {
+				w.methodChoice[d.ID] = auto
+				w.setMonitorMethod(d.ID, auto)
+			})
 		})
 	}
 }

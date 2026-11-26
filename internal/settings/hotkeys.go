@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/otnc/Volm/internal/config"
 	"github.com/otnc/Volm/internal/hook"
 	"github.com/otnc/Volm/internal/hotkey"
 	"github.com/otnc/Volm/internal/win32"
@@ -82,6 +83,22 @@ func (w *window) addHotkey(action hotkey.Action, c hotkey.Combo) {
 	w.save()
 }
 
+// resetHotkey gives the action its initial keys back, taking them away from any other action that uses them now.
+func (w *window) resetHotkey(action hotkey.Action) {
+	keys := maps.Clone(w.cfg.Hotkeys)
+	if keys == nil {
+		keys = map[string][]string{}
+	}
+	// An empty list, not a missing key: Load would give a missing action its default keys back.
+	keys[string(action)] = []string{}
+	w.cfg.Hotkeys = keys
+	for _, s := range config.Default().Hotkeys[string(action)] {
+		if c, err := hotkey.Parse(s); err == nil {
+			w.addHotkey(action, c)
+		}
+	}
+}
+
 func (w *window) removeHotkey(action hotkey.Action, index int) {
 	keys := maps.Clone(w.cfg.Hotkeys)
 	list := slices.Clone(keys[string(action)])
@@ -116,7 +133,10 @@ func (w *window) hotkeysPage(c *ui.Context) {
 						}
 					})
 				}
-				if len(keys) < hotkey.MaxKeysPerAction && w.hotkeys.capturing == "" {
+				if w.hotkeys.capturing != "" {
+					return
+				}
+				if len(keys) < hotkey.MaxKeysPerAction {
 					if ui.Button(c, "").Label(a.Label + " にキーを割り当てる").Children(func() {
 						ui.Icon(c, w.icons.add)
 						ui.Text(c, "追加").SingleLine()
@@ -124,6 +144,8 @@ func (w *window) hotkeysPage(c *ui.Context) {
 						w.startCapture(a.Action)
 					}
 				}
+				defaults := config.Default().Hotkeys[string(a.Action)]
+				w.resetButton(c, a.Label+" のキー", slices.Equal(keys, defaults), func() { w.resetHotkey(a.Action) })
 			})
 		})
 	}
