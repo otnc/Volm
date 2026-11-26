@@ -67,6 +67,13 @@ func runResident(configPath string) {
 		}
 	}
 
+	// The installer waits for this mutex to go before it replaces Volm.exe; see installer/volm.iss.
+	if name, err := windows.UTF16PtrFromString(runningMutex); err == nil {
+		if mutex, err := windows.CreateMutex(nil, false, name); err == nil {
+			defer func() { _ = windows.CloseHandle(mutex) }()
+		}
+	}
+
 	stopListening, err := ipc.ListenQuit(mygo.App.Quit)
 	if err != nil {
 		log.Printf("listening for quit requests: %v", err)
@@ -99,6 +106,9 @@ func runResident(configPath string) {
 	a.stop()
 	log.Print("Volm stopped")
 }
+
+// runningMutex exists while the resident process runs, for the installer's AppMutex.
+const runningMutex = `Local\VolmRunning`
 
 // settingsMutex keeps one settings window per user session.
 const settingsMutex = `Local\VolmSettings`

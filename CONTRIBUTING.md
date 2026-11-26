@@ -31,7 +31,15 @@ go run ./cmd/volm --settings   # 設定画面だけを開く
 go tool mygo build -skip-installer
 ```
 
-`build/windows-amd64/Volm.exe` ができます。Volm はすでに起動していると 2 つ目が常駐しないので、試す前にトレイのメニューの「終了」で前の Volm を終了してください。
+`build/windows-amd64/Volm.exe` ができます。
+
+インストーラーは [Inno Setup 6](https://jrsoftware.org/isinfo.php) で作ります。Inno Setup を入れてから、`Volm.exe` を作ったあとで次を実行すると、`dist/Volm-Setup-<バージョン>.exe` ができます。スクリプトは `installer/volm.iss` です。
+
+```sh
+bash scripts/build-installer.sh 0.1.0
+```
+
+Volm はすでに起動していると 2 つ目が常駐しないので、試す前にトレイのメニューの「終了」で前の Volm を終了してください。
 
 ## テスト
 
