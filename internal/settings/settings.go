@@ -12,6 +12,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"github.com/otnc/Volm/internal/brightness"
 	"github.com/otnc/Volm/internal/config"
 )
 
@@ -19,10 +20,11 @@ import (
 const WindowTitle = "Volm の設定"
 
 const (
-	pageGeneral = "general"
-	pageVolume  = "volume"
-	pageOSD     = "osd"
-	pageAbout   = "about"
+	pageGeneral    = "general"
+	pageVolume     = "volume"
+	pageBrightness = "brightness"
+	pageOSD        = "osd"
+	pageAbout      = "about"
 )
 
 // positions pairs the OSD positions with their labels, in menu order.
@@ -40,9 +42,15 @@ type window struct {
 	page string
 
 	// Mirrors of cfg in the types the widgets edit.
-	volumeStep    float64
-	osdSeconds    float64
-	positionLabel string
+	volumeStep     float64
+	brightnessStep float64
+	softDimMin     float64
+	osdSeconds     float64
+	positionLabel  string
+
+	displays     []brightness.Display
+	detecting    bool
+	methodChoice map[string]string // the label chosen in each monitor's menu
 
 	openAtLogin  bool
 	confirmReset bool
@@ -60,7 +68,7 @@ func Open(path string, cfg config.Config) {
 	w.logo, _ = ui.DecodeImage(logoPNG)
 	w.load(cfg)
 	w.openAtLogin = mygo.App.OpenAtLogin()
-	mygo.NewWindow(mygo.WindowOptions{
+	win := mygo.NewWindow(mygo.WindowOptions{
 		Title:     WindowTitle,
 		Width:     800,
 		Height:    560,
@@ -68,11 +76,14 @@ func Open(path string, cfg config.Config) {
 		MinHeight: 440,
 		Content:   ui.View(w.view),
 	})
+	w.detectMonitors(win)
 }
 
 func (w *window) load(cfg config.Config) {
 	w.cfg = cfg
 	w.volumeStep = float64(cfg.Volume.Step)
+	w.brightnessStep = float64(cfg.Brightness.Step)
+	w.softDimMin = float64(cfg.Brightness.SoftDimMin)
 	w.osdSeconds = float64(cfg.OSD.DurationMs) / 1000
 	w.positionLabel = positions[0].label
 	if i := slices.IndexFunc(positions, func(p struct{ value, label string }) bool { return p.value == cfg.OSD.Position }); i >= 0 {
@@ -100,6 +111,9 @@ func (w *window) setOpenAtLogin(on bool) {
 // reset restores every setting, including those of later features that this window does not show yet, and turns starting at login back on.
 func (w *window) reset() {
 	w.load(config.Default())
+	for id := range w.methodChoice {
+		w.methodChoice[id] = methodLabel(brightness.MethodAuto)
+	}
 	w.save()
 	w.setOpenAtLogin(true)
 }
@@ -116,6 +130,7 @@ func (w *window) view(c *ui.Context) {
 			ui.Sidebar(c, &w.page, func() {
 				ui.SidebarItem(c, pageGeneral, w.icons.tune, "一般")
 				ui.SidebarItem(c, pageVolume, w.icons.volumeUp, "音量")
+				ui.SidebarItem(c, pageBrightness, w.icons.brightness, "明るさ")
 				ui.SidebarItem(c, pageOSD, w.icons.osd, "OSD (画面表示)")
 				ui.SidebarItem(c, pageAbout, w.icons.info, "情報")
 			}).Grow(1)
@@ -134,6 +149,8 @@ func (w *window) view(c *ui.Context) {
 					w.generalPage(c)
 				case pageVolume:
 					w.volumePage(c)
+				case pageBrightness:
+					w.brightnessPage(c)
 				case pageOSD:
 					w.osdPage(c)
 				case pageAbout:
@@ -247,7 +264,7 @@ func (w *window) aboutPage(c *ui.Context) {
 		ui.Column(c).Gap(4).Children(func() {
 			ui.Text(c, "Volm").FontSize(22).Bold()
 			ui.Text(c, "バージョン "+mygo.App.Version()).TextColor(t.TextMuted)
-			ui.Text(c, "タスクバーの上のホイールで、音量を変えるアプリです。").TextColor(t.TextMuted)
+			ui.Text(c, "タスクバーの上のホイールで、音量とモニターの明るさを変えるアプリです。").TextColor(t.TextMuted)
 		})
 	})
 	row(c, w.icons.person, "作者", "", func() { ui.Text(c, "otoneko.") })
@@ -298,7 +315,8 @@ var iconFiles embed.FS
 
 type icons struct {
 	tune, volumeUp, volumeOff, osd, info, restart, power, mouse,
-	timer, position, visibility, code, gavel, person *ui.SVG
+	timer, position, visibility, code, gavel, person,
+	brightness, brightnessLow, monitor *ui.SVG
 }
 
 // loadIcons parses the Material Symbols (Rounded) icons in icons/.
@@ -311,19 +329,22 @@ func loadIcons() icons {
 		return ui.MustParseSVG(data)
 	}
 	return icons{
-		tune:       svg("tune"),
-		volumeUp:   svg("volume_up"),
-		volumeOff:  svg("volume_off"),
-		osd:        svg("branding_watermark"),
-		info:       svg("info"),
-		restart:    svg("restart_alt"),
-		power:      svg("power_settings_new"),
-		mouse:      svg("mouse"),
-		timer:      svg("timer"),
-		position:   svg("picture_in_picture_alt"),
-		visibility: svg("visibility"),
-		code:       svg("code"),
-		gavel:      svg("gavel"),
-		person:     svg("person"),
+		tune:          svg("tune"),
+		volumeUp:      svg("volume_up"),
+		volumeOff:     svg("volume_off"),
+		osd:           svg("branding_watermark"),
+		info:          svg("info"),
+		restart:       svg("restart_alt"),
+		power:         svg("power_settings_new"),
+		mouse:         svg("mouse"),
+		timer:         svg("timer"),
+		position:      svg("picture_in_picture_alt"),
+		brightness:    svg("light_mode"),
+		brightnessLow: svg("brightness_low"),
+		monitor:       svg("monitor"),
+		visibility:    svg("visibility"),
+		code:          svg("code"),
+		gavel:         svg("gavel"),
+		person:        svg("person"),
 	}
 }
