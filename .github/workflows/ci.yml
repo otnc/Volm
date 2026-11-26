@@ -31,6 +31,8 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # The newest patch release of that Go version, with its security fixes.
+          check-latest: true
       - run: bash scripts/check-format.sh
       # unsafeptr is off: COM objects and low-level hooks get pointers from Windows as uintptr.
       - run: go vet -unsafeptr=false ./...
@@ -52,6 +54,8 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # The newest patch release of that Go version, with its security fixes.
+          check-latest: true
       - run: bash scripts/check-generated.sh
 
   test:
@@ -66,6 +70,8 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # The newest patch release of that Go version, with its security fixes.
+          check-latest: true
       - run: go build ./...
       # The tests that change the system volume need VOLM_INTEGRATION=1 and a playback device, which runners lack; they skip here.
       - run: go test -race ./...

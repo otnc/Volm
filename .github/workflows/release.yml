@@ -69,6 +69,8 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # The newest patch release of that Go version, with its security fixes.
+          check-latest: true
       # mygo build writes the version of mygo.json into the executable; the tag decides it, not the committed file.
       - name: Set the version from the tag
         shell: pwsh
