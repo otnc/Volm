@@ -20,10 +20,11 @@ type kbdllHookStruct struct {
 }
 
 const (
-	wmKeyDown    = 0x0100
-	wmKeyUp      = 0x0101
-	wmSysKeyDown = 0x0104
-	wmSysKeyUp   = 0x0105
+	wmKeyDown     = 0x0100
+	wmKeyUp       = 0x0101
+	wmSysKeyDown  = 0x0104
+	wmSysKeyUp    = 0x0105
+	llkhfExtended = 0x01
 )
 
 // Keyboard is a running low-level keyboard hook.
@@ -45,8 +46,7 @@ type KeyEvent struct {
 // Windows itself handles Win+Up and Win+Down before RegisterHotKey sees them, which is why Volm uses a low-level hook. After an action whose combination holds Win or Alt, the caller sends win32.SendMaskKey, or the lone Win opens the Start menu.
 func StartKeyboard(lookup Lookup, out chan<- KeyEvent) (*Keyboard, error) {
 	h := &keyboardHook{taken: map[uint32]bool{}}
-	h.handle = func(vk uint32, mods hotkey.Modifiers) bool {
-		c := hotkey.Combo{Mods: mods, Key: uint16(vk)}
+	h.handle = func(c hotkey.Combo) bool {
 		a, ok := lookup(c)
 		if !ok {
 			return false
@@ -66,11 +66,11 @@ func StartKeyboard(lookup Lookup, out chan<- KeyEvent) (*Keyboard, error) {
 func Capture(out chan<- hotkey.Combo) (*Keyboard, error) {
 	h := &keyboardHook{taken: map[uint32]bool{}}
 	sent := false
-	h.handle = func(vk uint32, mods hotkey.Modifiers) bool {
+	h.handle = func(c hotkey.Combo) bool {
 		if !sent {
 			sent = true
 			select {
-			case out <- hotkey.Combo{Mods: mods, Key: uint16(vk)}:
+			case out <- c:
 			default: // out must be buffered; the callback cannot wait
 			}
 		}
@@ -84,7 +84,7 @@ func (k *Keyboard) Stop() { win32.QuitThread(k.threadID) }
 
 // keyboardHook's fields are only touched by its hook thread, apart from handle, set before the hook starts.
 type keyboardHook struct {
-	handle func(vk uint32, mods hotkey.Modifiers) bool
+	handle func(hotkey.Combo) bool
 	// taken holds the keys whose press the hook withheld, so that their release is withheld too.
 	taken map[uint32]bool
 }
@@ -107,7 +107,7 @@ func (h *keyboardHook) callback(code int32, wParam, lParam uintptr) uintptr {
 	if code >= 0 {
 		info := (*kbdllHookStruct)(unsafe.Pointer(lParam))
 		// Input that Volm sent itself passes, so that a media key it sends never runs a hotkey bound to that key. Input other apps inject, as remote desktop tools do, is handled like typing.
-		if info.ExtraInfo != win32.InputMarker && h.takes(wParam, info.VkCode) {
+		if info.ExtraInfo != win32.InputMarker && h.takes(wParam, info) {
 			return 1
 		}
 	}
@@ -115,22 +115,41 @@ func (h *keyboardHook) callback(code int32, wParam, lParam uintptr) uintptr {
 	return r
 }
 
-func (h *keyboardHook) takes(message uintptr, vk uint32) bool {
+func (h *keyboardHook) takes(message uintptr, info *kbdllHookStruct) bool {
+	c := comboKey(info)
+	if c.Key == 0 && c.Scan == 0 {
+		return false
+	}
+	// Keys without a virtual-key code all share one, so the key is remembered with its scan code.
+	id := uint32(c.Key)<<16 | uint32(c.Scan)
 	switch message {
 	case wmKeyUp, wmSysKeyUp:
-		taken := h.taken[vk]
-		delete(h.taken, vk)
+		taken := h.taken[id]
+		delete(h.taken, id)
 		return taken
 	case wmKeyDown, wmSysKeyDown:
-		if hotkey.IsModifierKey(uint16(vk)) {
+		if hotkey.IsModifierKey(c.Key) {
 			return false
 		}
-		if h.handle(vk, heldModifiers()) {
-			h.taken[vk] = true
+		c.Mods = heldModifiers()
+		if h.handle(c) {
+			h.taken[id] = true
 			return true
 		}
 	}
 	return false
+}
+
+// comboKey is the key of a key event, without modifiers. A key of an extra keyboard or a macro pad that Windows gives no virtual-key code (0, or 0xFF, "no mapping") is known by its scan code, with 0xE000 for an extended key.
+func comboKey(info *kbdllHookStruct) hotkey.Combo {
+	if info.VkCode != 0 && info.VkCode != 0xFF {
+		return hotkey.Combo{Key: uint16(info.VkCode)}
+	}
+	scan := uint16(info.ScanCode)
+	if info.Flags&llkhfExtended != 0 {
+		scan |= 0xE000
+	}
+	return hotkey.Combo{Scan: scan}
 }
 
 func heldModifiers() hotkey.Modifiers {

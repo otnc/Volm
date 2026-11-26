@@ -21,6 +21,8 @@ const vkEscape = 0x1B
 type hotkeyEditor struct {
 	// capturing is the action waiting for a key, or "" when none is.
 	capturing hotkey.Action
+	// notice tells why the last captured key was refused.
+	notice string
 	// pending is a captured combination that another action already uses, waiting for the user to confirm taking it over.
 	pending         hotkey.Combo
 	pendingFor      hotkey.Action
@@ -38,6 +40,7 @@ func (w *window) startCapture(action hotkey.Action) {
 		return
 	}
 	w.hotkeys.capturing = action
+	w.hotkeys.notice = ""
 	go func() {
 		c := <-combos
 		kb.Stop()
@@ -54,6 +57,11 @@ func (w *window) captured(action hotkey.Action, c hotkey.Combo) {
 	if c.Mods == 0 && c.Key == vkEscape {
 		return
 	}
+	if c.NeedsModifier() {
+		w.hotkeys.notice = "「" + c.String() + "」だけでは割り当てられません。このキーはほかのアプリでも使うので、Ctrl、Alt、Shift、Win のどれかと一緒に押してください。"
+		return
+	}
+	w.hotkeys.notice = ""
 	if other, taken := hotkey.Conflict(w.cfg.Hotkeys, c, action); taken {
 		w.hotkeys.pending, w.hotkeys.pendingFor, w.hotkeys.pendingFrom = c, action, other
 		w.hotkeys.confirmOverride = true
@@ -114,7 +122,10 @@ func (w *window) removeHotkey(action hotkey.Action, index int) {
 func (w *window) hotkeysPage(c *ui.Context) {
 	t := c.Theme()
 	pageTitle(c, "ホットキー")
-	ui.Text(c, "1 つの操作に、キーの組み合わせを 2 つまで割り当てられます。どのアプリが前面にあっても使えます。").FontSize(12).TextColor(t.TextMuted).Margin(0, 0, 4, 0)
+	ui.Text(c, "1 つの操作に、キーの組み合わせを 2 つまで割り当てられます。どのアプリが前面にあっても使えます。F13〜F24、メディアキー、拡張キーボードやマクロパッドの専用キーは、それだけでも割り当てられます。").FontSize(12).TextColor(t.TextMuted).Margin(0, 0, 4, 0)
+	if w.hotkeys.notice != "" {
+		ui.Text(c, w.hotkeys.notice).TextColor(t.Warning)
+	}
 	for _, a := range hotkey.Actions {
 		keys := w.cfg.Hotkeys[string(a.Action)]
 		row(c, w.icons.keyboard, a.Label, "", func() {

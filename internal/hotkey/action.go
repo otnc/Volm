@@ -46,7 +46,7 @@ const MaxKeysPerAction = 2
 // Bindings maps combinations to the actions they run.
 type Bindings map[Combo]Action
 
-// Bind reads the hotkeys of the settings file. A combination that does not parse, or that a second action also claims, is logged and skipped rather than failing the rest; the first action in Actions order keeps a shared combination.
+// Bind reads the hotkeys of the settings file. A combination that does not parse, that needs a modifier (see Combo.NeedsModifier), or that a second action also claims, is logged and skipped rather than failing the rest; the first action in Actions order keeps a shared combination.
 func Bind(hotkeys map[string][]string) Bindings {
 	b := Bindings{}
 	for _, a := range Actions {
@@ -57,6 +57,10 @@ func Bind(hotkeys map[string][]string) Bindings {
 			c, err := Parse(s)
 			if err != nil {
 				log.Printf("hotkey: %s: %v", a.Action, err)
+				continue
+			}
+			if c.NeedsModifier() {
+				log.Printf("hotkey: %s alone would stop the key working in other apps; skipped for %s", c, a.Action)
 				continue
 			}
 			if other, taken := b[c]; taken {
