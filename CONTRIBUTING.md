@@ -89,7 +89,7 @@ VOLM_INTEGRATION=1 go test ./internal/audio/
 |---|---|
 | lint | `gofmt`、`go vet`、golangci-lint、`go mod tidy -diff`、govulncheck。Windows 向けのビルドとして解析します |
 | generated | アイコン、ロゴ、`THIRD_PARTY_NOTICES.md` を生成し直し、コミットされたものと同じかを確かめます |
-| test | Windows で `go test -race ./...` と `go tool mygo build -skip-installer` を実行し、`Volm.exe` を成果物として残します |
+| test | Windows で `go test -race ./...`、`go tool mygo build -skip-installer`、インストーラーのビルドを実行し、`Volm.exe` を成果物として残します |
 | release-rules | リリースのバージョンを決めるスクリプトのテスト |
 
 生成ファイルが古いと言われたら、`bash scripts/check-generated.sh` を手元で実行し、変わったファイルをコミットしてください。
@@ -98,7 +98,7 @@ VOLM_INTEGRATION=1 go test ./internal/audio/
 
 リリースは、GitHub Actions の `release` を `main` から手動で実行して作ります。`version` には `patch`、`minor`、`major`、`prerelease` のどれか、または `1.2.0` のようなバージョンを入れます。`preid` には `rc` のようなプレリリースの識別子を入れられます。
 
-`release` は、次のバージョンのタグを決め、`CI` と同じ検査を通してから、Windows で `Volm.exe` を作ります。実行ファイルのバージョンはタグから決まるので、`mygo.json` の `version` を書き換える必要はありません。最後にタグを付け、`Volm-<バージョン>-windows-amd64.zip` と `SHA256SUMS` を付けた GitHub Release を作ります。インストーラーは、まだリリースに含めていません。
+`release` は、次のバージョンのタグを決め、`CI` と同じ検査を通してから、Windows で `Volm.exe` を作ります。実行ファイルのバージョンはタグから決まるので、`mygo.json` の `version` を書き換える必要はありません。最後にタグを付け、インストーラーの `Volm-Setup-<バージョン>.exe`、`Volm-<バージョン>-windows-amd64.zip`、`SHA256SUMS` を付けた GitHub Release を作ります。設定画面の「更新」は、このインストーラーと `SHA256SUMS` を使います。
 
 ## コミットとプルリクエスト
 

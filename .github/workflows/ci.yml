@@ -76,6 +76,9 @@ jobs:
       # The tests that change the system volume need VOLM_INTEGRATION=1 and a playback device, which runners lack; they skip here.
       - run: go test -race ./...
       - run: go tool mygo build -skip-installer
+      # Compiles installer/volm.iss, so that a broken script shows before a release.
+      - run: bash scripts/build-installer.sh 0.0.0
+        shell: bash
       - uses: actions/upload-artifact@v7
         with:
           name: volm-windows-amd64
