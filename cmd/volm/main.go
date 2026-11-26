@@ -1,7 +1,7 @@
 // Copyright (C) 2026 otoneko.
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Volm changes the volume with the mouse wheel over the taskbar.
+// Volm changes the volume, and with Ctrl the brightness of the monitors, with the mouse wheel over the taskbar.
 //
 //	volm.exe              the resident process: tray icon, hooks, OSD
 //	volm.exe --settings   the settings window, in a process of its own

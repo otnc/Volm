@@ -12,6 +12,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/otnc/Volm/internal/audio"
+	"github.com/otnc/Volm/internal/brightness"
 	"github.com/otnc/Volm/internal/config"
 	"github.com/otnc/Volm/internal/control"
 	"github.com/otnc/Volm/internal/hook"
@@ -29,10 +30,11 @@ type app struct {
 	events     chan hook.Event
 	stopWatch  context.CancelFunc
 
-	audio *audio.Endpoint
-	osd   *osd.OSD
-	tray  *tray.Tray
-	mouse *hook.Mouse
+	audio      *audio.Endpoint
+	brightness *brightness.Manager // nil when it failed to start; volume still works
+	osd        *osd.OSD
+	tray       *tray.Tray
+	mouse      *hook.Mouse
 }
 
 func newApp(configPath string, cfg config.Config) *app {
@@ -49,6 +51,9 @@ func (a *app) start() error {
 	}
 	if a.osd, err = osd.New(); err != nil {
 		return err
+	}
+	if a.brightness, err = brightness.Start(); err != nil {
+		log.Printf("brightness: %v", err)
 	}
 	if a.tray, err = tray.New(tray.Actions{
 		ToggleMute:   func() { go a.toggleMute(win32.CursorPos()) },
@@ -74,19 +79,22 @@ func (a *app) stop() {
 	if a.osd != nil {
 		a.osd.Close()
 	}
+	if a.brightness != nil {
+		a.brightness.Close()
+	}
 	if a.audio != nil {
 		a.audio.Close()
 	}
 }
 
-// takes runs inside the mouse hook callback and must return at once. Ctrl and Alt with the wheel are left to other apps until brightness and per-app volume take them.
+// takes runs inside the mouse hook callback and must return at once. Alt with the wheel is left to other apps until per-app volume takes it.
 func (a *app) takes(ev hook.Event) bool {
 	if !ev.OnTaskbar {
 		return false
 	}
 	switch ev.Kind {
 	case hook.Wheel:
-		return !ev.Ctrl && !ev.Alt
+		return !ev.Alt
 	case hook.MiddleClick:
 		return a.cfg.Load().Volume.MiddleClickMute
 	}
@@ -94,16 +102,22 @@ func (a *app) takes(ev hook.Event) bool {
 }
 
 func (a *app) handleInput() {
-	var notches control.NotchCounter
+	// Volume and brightness count notches apart, so that pressing Ctrl in the middle of a gesture does not carry a partial notch over.
+	var volumeNotches, brightnessNotches control.NotchCounter
 	var lastWheel time.Time
 	for ev := range a.events {
 		switch ev.Kind {
 		case hook.Wheel:
 			if time.Since(lastWheel) > wheelGestureGap {
-				notches.Reset()
+				volumeNotches.Reset()
+				brightnessNotches.Reset()
 			}
 			lastWheel = time.Now()
-			if n := notches.Add(ev.Delta); n != 0 {
+			if ev.Ctrl {
+				if n := brightnessNotches.Add(ev.Delta); n != 0 {
+					a.stepBrightness(n, ev.Shift, ev.Pos)
+				}
+			} else if n := volumeNotches.Add(ev.Delta); n != 0 {
 				a.stepVolume(n, ev.Pos)
 			}
 		case hook.MiddleClick:
@@ -118,6 +132,26 @@ func (a *app) stepVolume(notches int, at win32.Point) {
 	a.showVolume(st, err, at)
 }
 
+// stepBrightness changes the monitor under the cursor, or every monitor with Shift.
+func (a *app) stepBrightness(notches int, all bool, at win32.Point) {
+	if a.brightness == nil {
+		return
+	}
+	changes, err := a.brightness.Step(at, all, notches, a.cfg.Load().Brightness)
+	switch {
+	case errors.Is(err, brightness.ErrDetecting):
+		a.show(osd.Content{Icon: osd.IconBrightness, Title: "モニターを調べています"}, at)
+	case err != nil:
+		log.Printf("brightness: %v", err)
+	case len(changes) > 0:
+		title := changes[0].Name
+		if all {
+			title = "すべてのモニター"
+		}
+		a.show(osd.Content{Icon: osd.IconBrightness, Title: title, Percent: changes[0].Percent}, at)
+	}
+}
+
 func (a *app) toggleMute(at win32.Point) {
 	st, err := a.audio.ToggleMute()
 	a.showVolume(st, err, at)
@@ -127,13 +161,17 @@ func (a *app) showVolume(st audio.State, err error, at win32.Point) {
 	if err != nil && !errors.Is(err, audio.ErrNoDevice) {
 		log.Printf("volume: %v", err)
 	}
-	cfg := a.cfg.Load()
-	if !cfg.OSD.Enabled {
-		return
-	}
 	content := osd.Content{Icon: osd.SpeakerIcon(st.Percent, st.Muted), Title: st.Device, Percent: st.Percent, Muted: st.Muted}
 	if err != nil {
 		content = osd.Content{Icon: osd.IconMute, Title: "再生デバイスがありません"}
+	}
+	a.show(content, at)
+}
+
+func (a *app) show(content osd.Content, at win32.Point) {
+	cfg := a.cfg.Load()
+	if !cfg.OSD.Enabled {
+		return
 	}
 	a.osd.Show(content, osd.Placement{
 		Near:     at,
@@ -170,6 +208,9 @@ func (a *app) watchConfig() {
 				continue
 			}
 			a.cfg.Store(&cfg)
+			if a.brightness != nil {
+				a.brightness.ApplyConfig(cfg.Brightness)
+			}
 			log.Print("settings reloaded")
 		}
 	}()

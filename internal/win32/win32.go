@@ -51,6 +51,9 @@ var (
 	ProcGetCursorPos               = user32.NewProc("GetCursorPos")
 	ProcPostQuitMessage            = user32.NewProc("PostQuitMessage")
 	ProcFindWindowW                = user32.NewProc("FindWindowW")
+	ProcEnumDisplayMonitors        = user32.NewProc("EnumDisplayMonitors")
+	ProcEnumDisplayDevicesW        = user32.NewProc("EnumDisplayDevicesW")
+	ProcGetDpiForWindow            = user32.NewProc("GetDpiForWindow")
 	ProcSetForegroundWindow        = user32.NewProc("SetForegroundWindow")
 	ProcIsIconic                   = user32.NewProc("IsIconic")
 
@@ -61,6 +64,7 @@ var (
 	ProcDeleteDC               = gdi32.NewProc("DeleteDC")
 	ProcBitBlt                 = gdi32.NewProc("BitBlt")
 	ProcCreateSolidBrush       = gdi32.NewProc("CreateSolidBrush")
+	ProcGetStockObject         = gdi32.NewProc("GetStockObject")
 	ProcCreateFontW            = gdi32.NewProc("CreateFontW")
 	ProcSetBkMode              = gdi32.NewProc("SetBkMode")
 	ProcSetTextColor           = gdi32.NewProc("SetTextColor")
@@ -77,15 +81,16 @@ const (
 	WH_KEYBOARD_LL = 13
 	WH_MOUSE_LL    = 14
 
-	WM_DESTROY     = 0x0002
-	WM_PAINT       = 0x000F
-	WM_ERASEBKGND  = 0x0014
-	WM_QUIT        = 0x0012
-	WM_TIMER       = 0x0113
-	WM_MOUSEWHEEL  = 0x020A
-	WM_MBUTTONDOWN = 0x0207
-	WM_MBUTTONUP   = 0x0208
-	WM_APP         = 0x8000
+	WM_DESTROY       = 0x0002
+	WM_PAINT         = 0x000F
+	WM_ERASEBKGND    = 0x0014
+	WM_QUIT          = 0x0012
+	WM_TIMER         = 0x0113
+	WM_MOUSEWHEEL    = 0x020A
+	WM_MBUTTONDOWN   = 0x0207
+	WM_MBUTTONUP     = 0x0208
+	WM_APP           = 0x8000
+	WM_DISPLAYCHANGE = 0x007E
 
 	GA_ROOT = 2
 
@@ -125,6 +130,7 @@ const (
 	DT_END_ELLIPSIS = 0x8000
 	TRANSPARENT     = 1
 	SRCCOPY         = 0x00CC0020
+	BLACK_BRUSH     = 4
 
 	DWMWA_WINDOW_CORNER_PREFERENCE = 33
 	DWMWCP_ROUND                   = 2
