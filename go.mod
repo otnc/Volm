@@ -2,6 +2,8 @@ module github.com/otnc/Volm
 
 go 1.27.3
 
+toolchain go1.27.4
+
 require (
 	github.com/egoist/mygo v0.10.0
 	github.com/go-ole/go-ole v1.3.0
