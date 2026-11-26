@@ -8,6 +8,7 @@ import _ "embed"
 // Level is the volume band the tray icon shows.
 type Level int
 
+// The bands, from silent to loud.
 const (
 	LevelMuted Level = iota
 	LevelLow

@@ -177,20 +177,6 @@ func encodePNG(img image.Image) []byte {
 	return buf.Bytes()
 }
 
-// ring is a circle stroked all the way round.
-type ring struct {
-	cx, cy, r, width float64
-	stroke           rgba
-}
-
-func (s ring) distance(x, y float64) float64 {
-	return math.Abs(math.Hypot(x-s.cx, y-s.cy)-s.r) - s.width/2
-}
-func (s ring) color() rgba { return s.stroke }
-func (s ring) svg() string {
-	return fmt.Sprintf(`<circle cx="%g" cy="%g" r="%g" fill="none" stroke-width="%g" %s/>`, s.cx, s.cy, s.r, s.width, s.stroke.svgPaint("stroke"))
-}
-
 // polygon is a filled convex polygon whose points run clockwise on screen.
 type polygon struct {
 	points [][2]float64

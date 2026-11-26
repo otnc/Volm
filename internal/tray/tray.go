@@ -6,6 +6,7 @@ package tray
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/egoist/mygo"
 )
@@ -55,7 +56,9 @@ func (t *Tray) Update(percent int, muted bool, device string) {
 	mygo.RunOnMain(func() {
 		if level := LevelOf(percent, muted); level != t.level {
 			t.level = level
-			t.icon.SetIcon(levelIcon(level), false)
+			if err := t.icon.SetIcon(levelIcon(level), false); err != nil {
+				log.Printf("tray: setting icon: %v", err)
+			}
 		}
 		t.icon.SetToolTip(Tooltip(percent, muted, device))
 		t.mute.SetChecked(muted)

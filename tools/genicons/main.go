@@ -53,7 +53,7 @@ func main() {
 // writeICO stores each size as PNG, which Windows Vista and later read from .ico files.
 func writeICO(path string, d drawing, sizes []int) {
 	var header, images bytes.Buffer
-	binary.Write(&header, binary.LittleEndian, [3]uint16{0, 1, uint16(len(sizes))})
+	must(binary.Write(&header, binary.LittleEndian, [3]uint16{0, 1, uint16(len(sizes))}))
 	offset := 6 + 16*len(sizes)
 	for _, size := range sizes {
 		data := encodePNG(d.render(size))
@@ -61,15 +61,21 @@ func writeICO(path string, d drawing, sizes []int) {
 		if size >= 256 {
 			dim = 0 // 0 means 256 in an icon directory entry
 		}
-		binary.Write(&header, binary.LittleEndian, struct {
+		must(binary.Write(&header, binary.LittleEndian, struct {
 			W, H, Colors, Reserved uint8
 			Planes, BitCount       uint16
 			Size, Offset           uint32
-		}{dim, dim, 0, 0, 1, 32, uint32(len(data)), uint32(offset)})
+		}{dim, dim, 0, 0, 1, 32, uint32(len(data)), uint32(offset)}))
 		images.Write(data)
 		offset += len(data)
 	}
 	writeFile(path, append(header.Bytes(), images.Bytes()...))
+}
+
+func must(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func writeFile(path string, data []byte) {

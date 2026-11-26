@@ -474,7 +474,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## Go standard library go1.27.4
+## Go standard library
 
 ```text
 Copyright 2009 The Go Authors.

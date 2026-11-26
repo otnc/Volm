@@ -89,7 +89,7 @@ func (e *Endpoint) run(ready chan<- error) {
 		ready <- err
 		return
 	}
-	defer e.enumerator.UnregisterEndpointNotificationCallback(e.notifier)
+	defer func() { _ = e.enumerator.UnregisterEndpointNotificationCallback(e.notifier) }()
 
 	e.rebind()
 	defer e.unbind()

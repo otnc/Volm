@@ -1,0 +1,30 @@
+version: "2"
+linters:
+  default: standard
+  enable:
+    - errorlint
+    - gocritic
+    - misspell
+    - revive
+    - unconvert
+    - usestdlibvars
+  settings:
+    errcheck:
+      exclude-functions:
+        # The error of a Win32 call is GetLastError, which holds a stale value after a success. Code that cares checks the first result instead.
+        - (*golang.org/x/sys/windows.LazyProc).Call
+        - syscall.SyscallN
+    govet:
+      disable:
+        # COM objects and low-level hooks get pointers from Windows as uintptr.
+        - unsafeptr
+  exclusions:
+    rules:
+      # internal/win32 keeps the names of the Win32 headers, such as WM_PAINT.
+      - path: internal/win32/
+        linters: [revive]
+        text: "var-naming"
+formatters:
+  enable:
+    - gofmt
+    - goimports

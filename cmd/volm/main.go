@@ -95,7 +95,7 @@ func runSettings(configPath string) {
 		return
 	}
 	if err == nil {
-		defer windows.CloseHandle(mutex)
+		defer func() { _ = windows.CloseHandle(mutex) }()
 	}
 	closeLog := openLog(filepath.Join(filepath.Dir(configPath), "volm.log"))
 	defer closeLog()
@@ -123,7 +123,10 @@ func openSettings() {
 		log.Printf("opening settings: %v", err)
 		return
 	}
-	cmd.Process.Release() // never waited for: the window lives on its own
+	// Never waited for: the window lives on its own.
+	if err := cmd.Process.Release(); err != nil {
+		log.Printf("opening settings: %v", err)
+	}
 }
 
 func notifySettingsReset(configPath string) {
@@ -139,7 +142,7 @@ func notifySettingsReset(configPath string) {
 // openLog sends the standard logger to path, keeping one older generation as path+".1" once the file passes maxLogSize. The resident and settings processes append to the same file.
 func openLog(path string) (closeLog func()) {
 	if info, err := os.Stat(path); err == nil && info.Size() > maxLogSize {
-		os.Rename(path, path+".1")
+		_ = os.Rename(path, path+".1") // without rotation the log only keeps growing
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return func() {}
@@ -149,5 +152,5 @@ func openLog(path string) (closeLog func()) {
 		return func() {}
 	}
 	log.SetOutput(f)
-	return func() { f.Close() }
+	return func() { _ = f.Close() }
 }

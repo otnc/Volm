@@ -208,7 +208,7 @@ func currentTheme() theme {
 	if err != nil {
 		return lightTheme
 	}
-	defer k.Close()
+	defer func() { _ = k.Close() }()
 	if light, _, err := k.GetIntegerValue("AppsUseLightTheme"); err == nil && light == 0 {
 		return darkTheme
 	}

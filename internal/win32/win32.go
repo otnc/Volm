@@ -11,6 +11,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// The DLLs and their functions, named as in the Windows SDK with a Proc prefix.
 var (
 	user32   = windows.NewLazySystemDLL("user32.dll")
 	gdi32    = windows.NewLazySystemDLL("gdi32.dll")
@@ -71,6 +72,7 @@ var (
 	ProcGetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
 )
 
+// Constants of the Windows SDK, under their SDK names.
 const (
 	WH_KEYBOARD_LL = 13
 	WH_MOUSE_LL    = 14
@@ -128,16 +130,22 @@ const (
 	DWMWCP_ROUND                   = 2
 )
 
+// Point is POINT.
 type Point struct{ X, Y int32 }
 
 // Packed returns p as Windows passes a POINT by value on x64: in one register.
 func (p Point) Packed() uintptr { return uintptr(uint32(p.X)) | uintptr(uint32(p.Y))<<32 }
 
+// Rect is RECT.
 type Rect struct{ Left, Top, Right, Bottom int32 }
 
-func (r Rect) Width() int32  { return r.Right - r.Left }
+// Width returns Right - Left.
+func (r Rect) Width() int32 { return r.Right - r.Left }
+
+// Height returns Bottom - Top.
 func (r Rect) Height() int32 { return r.Bottom - r.Top }
 
+// MonitorInfo is MONITORINFO.
 type MonitorInfo struct {
 	Size    uint32
 	Monitor Rect
@@ -145,6 +153,7 @@ type MonitorInfo struct {
 	Flags   uint32
 }
 
+// MSLLHookStruct is MSLLHOOKSTRUCT, what a WH_MOUSE_LL hook receives.
 type MSLLHookStruct struct {
 	Pt        Point
 	MouseData uint32
@@ -153,6 +162,7 @@ type MSLLHookStruct struct {
 	ExtraInfo uintptr
 }
 
+// KeybdInput is INPUT holding a KEYBDINPUT.
 type KeybdInput struct {
 	Type      uint32
 	_         uint32
@@ -164,6 +174,7 @@ type KeybdInput struct {
 	_         [8]byte // pads to the size of INPUT, whose union is as large as MOUSEINPUT
 }
 
+// WndClassEx is WNDCLASSEXW.
 type WndClassEx struct {
 	Size       uint32
 	Style      uint32
@@ -179,6 +190,7 @@ type WndClassEx struct {
 	IconSm     windows.Handle
 }
 
+// PaintStruct is PAINTSTRUCT.
 type PaintStruct struct {
 	HDC       uintptr
 	Erase     int32

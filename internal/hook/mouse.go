@@ -14,6 +14,7 @@ import (
 // Kind says which input an Event is.
 type Kind int
 
+// The kinds of input the hook reports.
 const (
 	Wheel Kind = iota + 1
 	MiddleClick

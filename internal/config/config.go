@@ -174,14 +174,12 @@ func Save(path string, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmp.Name())
+	defer func() { _ = os.Remove(tmp.Name()) }() // fails harmlessly once the rename moved the file
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return err
+		return errors.Join(err, tmp.Close())
 	}
 	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		return err
+		return errors.Join(err, tmp.Close())
 	}
 	if err := tmp.Close(); err != nil {
 		return err

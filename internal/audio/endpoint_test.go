@@ -34,7 +34,11 @@ func TestStepChangesVolumeAndNotifies(t *testing.T) {
 	if before.Percent >= 98 {
 		notches = -1
 	}
-	t.Cleanup(func() { ep.Step(-notches, 2, false) })
+	t.Cleanup(func() {
+		if _, err := ep.Step(-notches, 2, false); err != nil {
+			t.Errorf("restoring volume: %v", err)
+		}
+	})
 
 	after, err := ep.Step(notches, 2, false)
 	if err != nil {
@@ -53,9 +57,7 @@ func TestToggleMuteFlipsAndNotifies(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if st, _ := ep.Current(); st.Muted != before.Muted {
-			ep.ToggleMute()
-		}
+		restoreMute(t, ep, before.Muted)
 	})
 
 	toggled, err := ep.ToggleMute()
@@ -78,10 +80,10 @@ func TestStepUpUnmutesOnlyWhenAsked(t *testing.T) {
 		t.Skip("volume too close to 100% to step up twice")
 	}
 	t.Cleanup(func() {
-		ep.Step(-2, 2, false)
-		if st, _ := ep.Current(); st.Muted != before.Muted {
-			ep.ToggleMute()
+		if _, err := ep.Step(-2, 2, false); err != nil {
+			t.Errorf("restoring volume: %v", err)
 		}
+		restoreMute(t, ep, before.Muted)
 	})
 	if !before.Muted {
 		if _, err := ep.ToggleMute(); err != nil {
@@ -102,6 +104,20 @@ func TestStepUpUnmutesOnlyWhenAsked(t *testing.T) {
 	}
 	if st.Muted {
 		t.Fatal("stepping up stayed muted although unmuteOnIncrease was true")
+	}
+}
+
+func restoreMute(t *testing.T, ep *Endpoint, muted bool) {
+	t.Helper()
+	st, err := ep.Current()
+	if err != nil {
+		t.Errorf("reading mute: %v", err)
+		return
+	}
+	if st.Muted != muted {
+		if _, err := ep.ToggleMute(); err != nil {
+			t.Errorf("restoring mute: %v", err)
+		}
 	}
 }
 

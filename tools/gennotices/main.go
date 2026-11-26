@@ -18,7 +18,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 )
@@ -41,7 +40,7 @@ func main() {
 	for _, m := range linkedModules() {
 		section(&out, m.Path+" "+m.Version, licenseText(m.Dir))
 	}
-	section(&out, "Go standard library "+runtime.Version(), licenseText(runtime.GOROOT()))
+	section(&out, "Go standard library", licenseText(goEnv("GOROOT")))
 	section(&out, "Material Symbols (Google, used in the settings window)", materialSymbolsLicense)
 
 	if err := os.WriteFile("THIRD_PARTY_NOTICES.md", out.Bytes(), 0o644); err != nil {
@@ -75,6 +74,15 @@ func linkedModules() []module {
 	}
 	slices.SortFunc(mods, func(a, b module) int { return cmp.Compare(a.Path, b.Path) })
 	return mods
+}
+
+// goEnv asks the go command, which also builds the app, rather than the runtime of this tool.
+func goEnv(name string) string {
+	out, err := exec.Command("go", "env", name).Output()
+	if err != nil {
+		log.Fatalf("go env %s: %v", name, err)
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func licenseText(dir string) string {
