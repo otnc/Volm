@@ -22,6 +22,8 @@ type Content struct {
 	Title   string
 	Percent int
 	Muted   bool
+	// Status replaces the percentage, and empties the bar, when the level does not apply, as for an app that plays no sound.
+	Status string
 }
 
 // Placement says where the panel goes and for how long.

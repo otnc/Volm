@@ -312,6 +312,14 @@ func (w *window) volumePage(c *ui.Context) {
 			w.cfg.Volume.MiddleClickMute = def.Volume.MiddleClickMute
 		})
 	})
+	row(c, w.icons.apps, "Alt+ホイールでアプリごとの音量を変える", "タスクバーのアプリのボタンの上で Alt を押しながら回すと、そのアプリの音量だけが変わります。", func() {
+		if ui.Switch(c, &w.cfg.Volume.AppVolumeWithAlt).Label("Alt+ホイールでアプリごとの音量を変える").Changed() {
+			w.save()
+		}
+		w.resetButton(c, "Alt+ホイールでアプリごとの音量を変える", w.cfg.Volume.AppVolumeWithAlt == def.Volume.AppVolumeWithAlt, func() {
+			w.cfg.Volume.AppVolumeWithAlt = def.Volume.AppVolumeWithAlt
+		})
+	})
 }
 
 func (w *window) osdPage(c *ui.Context) {
@@ -409,7 +417,7 @@ var iconFiles embed.FS
 
 type icons struct {
 	tune, volumeUp, volumeOff, osd, info, restart, mouse,
-	timer, position, visibility, code, gavel, person, login, restartApp, quit,
+	timer, position, visibility, code, gavel, person, login, restartApp, quit, apps,
 	brightness, brightnessLow, monitor,
 	keyboard, add, close *ui.SVG
 }
@@ -440,6 +448,7 @@ func loadIcons() icons {
 		login:         svg("login"),
 		restartApp:    svg("autorenew"),
 		quit:          svg("power_settings_new"),
+		apps:          svg("apps"),
 		add:           svg("add"),
 		close:         svg("close"),
 		visibility:    svg("visibility"),

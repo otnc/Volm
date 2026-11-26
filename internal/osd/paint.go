@@ -116,11 +116,15 @@ func (o *OSD) paint() {
 		value = "ミュート中"
 		fill = t.mutedFill
 	}
+	percent := c.Percent
+	if c.Status != "" {
+		value, percent = c.Status, 0
+	}
 	barTop, barHeight := o.px(48), max(o.px(6), 2)
 	bar := win32.Rect{Left: textLeft, Top: barTop, Right: valueLeft - o.px(12), Bottom: barTop + barHeight}
 	fillRect(mem, bar, t.track)
 	filled := bar
-	filled.Right = bar.Left + bar.Width()*int32(min(max(c.Percent, 0), 100))/100
+	filled.Right = bar.Left + bar.Width()*int32(min(max(percent, 0), 100))/100
 	fillRect(mem, filled, fill)
 	drawText(mem, o.fonts.value, value, win32.Rect{Left: valueLeft, Top: barTop - o.px(12), Right: w - pad, Bottom: barTop + barHeight + o.px(12)}, win32.DT_RIGHT)
 

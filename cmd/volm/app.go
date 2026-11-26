@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+	"github.com/otnc/Volm/internal/appid"
 	"github.com/otnc/Volm/internal/audio"
 	"github.com/otnc/Volm/internal/brightness"
 	"github.com/otnc/Volm/internal/config"
@@ -18,6 +19,7 @@ import (
 	"github.com/otnc/Volm/internal/hook"
 	"github.com/otnc/Volm/internal/hotkey"
 	"github.com/otnc/Volm/internal/osd"
+	"github.com/otnc/Volm/internal/taskbar"
 	"github.com/otnc/Volm/internal/tray"
 	"github.com/otnc/Volm/internal/win32"
 )
@@ -36,6 +38,7 @@ type app struct {
 	audio      *audio.Endpoint
 	brightness *brightness.Manager // nil when it failed to start; volume still works
 	osd        *osd.OSD
+	taskbar    *taskbar.Finder // nil when UI Automation failed to start; per-app volume is then off
 	tray       *tray.Tray
 	mouse      *hook.Mouse
 	keyboard   *hook.Keyboard
@@ -58,6 +61,9 @@ func (a *app) start() error {
 	}
 	if a.brightness, err = brightness.Start(); err != nil {
 		log.Printf("brightness: %v", err)
+	}
+	if a.taskbar, err = taskbar.NewFinder(); err != nil {
+		log.Printf("taskbar: %v", err)
 	}
 	if a.tray, err = tray.New(tray.Actions{
 		ToggleMute:   func() { go a.toggleMute(win32.CursorPos()) },
@@ -95,6 +101,9 @@ func (a *app) stop() {
 	if a.brightness != nil {
 		a.brightness.Close()
 	}
+	if a.taskbar != nil {
+		a.taskbar.Close()
+	}
 	if a.audio != nil {
 		a.audio.Close()
 	}
@@ -110,7 +119,7 @@ func (a *app) takes(ev hook.Event) bool {
 	case hook.Wheel:
 		switch {
 		case ev.Alt:
-			return false
+			return cfg.Volume.AppVolumeWithAlt && a.taskbar != nil
 		case ev.Ctrl:
 			return cfg.Brightness.WheelEnabled
 		default:
@@ -124,7 +133,8 @@ func (a *app) takes(ev hook.Event) bool {
 
 func (a *app) handleInput() {
 	// Volume and brightness count notches apart, so that pressing Ctrl in the middle of a gesture does not carry a partial notch over.
-	var volumeNotches, brightnessNotches control.NotchCounter
+	var volumeNotches, brightnessNotches, appNotches control.NotchCounter
+	var apps appCache
 	var lastWheel time.Time
 	for ev := range a.events {
 		switch ev.Kind {
@@ -132,9 +142,16 @@ func (a *app) handleInput() {
 			if time.Since(lastWheel) > wheelGestureGap {
 				volumeNotches.Reset()
 				brightnessNotches.Reset()
+				appNotches.Reset()
 			}
 			lastWheel = time.Now()
-			if ev.Ctrl {
+			if ev.Alt {
+				// Alt is still held; without this, the foreground app focuses its menu bar when it is released.
+				win32.SendMaskKey()
+				if n := appNotches.Add(ev.Delta); n != 0 {
+					a.stepAppVolume(n, ev.Pos, &apps)
+				}
+			} else if ev.Ctrl {
 				if n := brightnessNotches.Add(ev.Delta); n != 0 {
 					a.stepBrightness(n, ev.Shift, ev.Pos)
 				}
@@ -333,4 +350,40 @@ func (a *app) deviceSwitchFailed(err error) {
 	if err := openURL("ms-settings:sound"); err != nil {
 		log.Printf("opening sound settings: %v", err)
 	}
+}
+
+// appCache keeps the app found under the cursor for a moment, as UI Automation and the window enumeration take milliseconds and a wheel sends many notches over the same button.
+type appCache struct {
+	button taskbar.Button
+	target appid.Target
+	found  time.Time
+}
+
+const appCacheLifetime = 2 * time.Second
+
+// stepAppVolume changes the volume of the app whose taskbar button is under the cursor. Over anything else on the taskbar it does nothing.
+func (a *app) stepAppVolume(notches int, at win32.Point, cache *appCache) {
+	button, ok, err := a.taskbar.ButtonAt(at)
+	if err != nil || !ok {
+		return
+	}
+	if button.AUMID != cache.button.AUMID || time.Since(cache.found) > appCacheLifetime {
+		target, err := a.taskbar.Target(button)
+		if err != nil {
+			log.Printf("app volume: %v", err)
+			return
+		}
+		*cache = appCache{button: button, target: target, found: time.Now()}
+	}
+	vol := a.cfg.Load().Volume
+	st, err := a.audio.StepApp(cache.target, notches, vol.Step, vol.UnmuteOnIncrease)
+	if err != nil {
+		log.Printf("app volume: %v", err)
+		return
+	}
+	content := osd.Content{Icon: osd.SpeakerIcon(st.Percent, st.Muted), Title: button.Name, Percent: st.Percent, Muted: st.Muted}
+	if !st.Found {
+		content = osd.Content{Icon: osd.IconSpeakerZero, Title: button.Name, Status: "音声なし"}
+	}
+	a.show(content, at)
 }

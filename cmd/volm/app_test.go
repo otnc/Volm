@@ -30,7 +30,7 @@ func TestTakes(t *testing.T) {
 		{"wheel elsewhere", withMiddle, hook.Event{Kind: hook.Wheel}, false},
 		{"ctrl wheel for brightness", withMiddle, hook.Event{Kind: hook.Wheel, OnTaskbar: true, Ctrl: true}, true},
 		{"ctrl shift wheel for every monitor", withMiddle, hook.Event{Kind: hook.Wheel, OnTaskbar: true, Ctrl: true, Shift: true}, true},
-		{"alt wheel is left for per-app volume", withMiddle, hook.Event{Kind: hook.Wheel, OnTaskbar: true, Alt: true}, false},
+		{"alt wheel without a taskbar finder", withMiddle, hook.Event{Kind: hook.Wheel, OnTaskbar: true, Alt: true}, false},
 		{"wheel with volume control off", volumeOff, hook.Event{Kind: hook.Wheel, OnTaskbar: true}, false},
 		{"ctrl wheel with volume control off", volumeOff, hook.Event{Kind: hook.Wheel, OnTaskbar: true, Ctrl: true}, true},
 		{"ctrl wheel with brightness control off", brightnessOff, hook.Event{Kind: hook.Wheel, OnTaskbar: true, Ctrl: true}, false},
