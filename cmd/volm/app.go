@@ -16,6 +16,7 @@ import (
 	"github.com/otnc/Volm/internal/config"
 	"github.com/otnc/Volm/internal/control"
 	"github.com/otnc/Volm/internal/hook"
+	"github.com/otnc/Volm/internal/hotkey"
 	"github.com/otnc/Volm/internal/osd"
 	"github.com/otnc/Volm/internal/tray"
 	"github.com/otnc/Volm/internal/win32"
@@ -27,7 +28,9 @@ const wheelGestureGap = 500 * time.Millisecond
 type app struct {
 	configPath string
 	cfg        atomic.Pointer[config.Config]
+	bindings   atomic.Pointer[hotkey.Bindings]
 	events     chan hook.Event
+	keys       chan hook.KeyEvent
 	stopWatch  context.CancelFunc
 
 	audio      *audio.Endpoint
@@ -35,11 +38,12 @@ type app struct {
 	osd        *osd.OSD
 	tray       *tray.Tray
 	mouse      *hook.Mouse
+	keyboard   *hook.Keyboard
 }
 
 func newApp(configPath string, cfg config.Config) *app {
-	a := &app{configPath: configPath, events: make(chan hook.Event, 64), stopWatch: func() {}}
-	a.cfg.Store(&cfg)
+	a := &app{configPath: configPath, events: make(chan hook.Event, 64), keys: make(chan hook.KeyEvent, 16), stopWatch: func() {}}
+	a.setConfig(cfg)
 	return a
 }
 
@@ -57,6 +61,8 @@ func (a *app) start() error {
 	}
 	if a.tray, err = tray.New(tray.Actions{
 		ToggleMute:   func() { go a.toggleMute(win32.CursorPos()) },
+		Devices:      a.trayDevices,
+		SelectDevice: func(id string) { go a.selectDevice(id) },
 		OpenSettings: openSettings,
 		Quit:         mygo.App.Quit,
 	}); err != nil {
@@ -65,6 +71,10 @@ func (a *app) start() error {
 	if a.mouse, err = hook.StartMouse(a.takes, a.events); err != nil {
 		return err
 	}
+	if a.keyboard, err = hook.StartKeyboard(a.hotkeyAction, a.keys); err != nil {
+		return err
+	}
+	go a.handleHotkeys()
 	go a.followVolume()
 	go a.handleInput()
 	a.watchConfig()
@@ -75,6 +85,9 @@ func (a *app) stop() {
 	a.stopWatch()
 	if a.mouse != nil {
 		a.mouse.Stop()
+	}
+	if a.keyboard != nil {
+		a.keyboard.Stop()
 	}
 	if a.osd != nil {
 		a.osd.Close()
@@ -207,11 +220,109 @@ func (a *app) watchConfig() {
 				log.Printf("reloading settings: %v", err)
 				continue
 			}
-			a.cfg.Store(&cfg)
+			a.setConfig(cfg)
 			if a.brightness != nil {
 				a.brightness.ApplyConfig(cfg.Brightness)
 			}
 			log.Print("settings reloaded")
 		}
 	}()
+}
+
+// setConfig publishes new settings, and the hotkeys they bind, to the hooks and the input handlers.
+func (a *app) setConfig(cfg config.Config) {
+	bindings := hotkey.Bind(cfg.Hotkeys)
+	a.bindings.Store(&bindings)
+	a.cfg.Store(&cfg)
+}
+
+// hotkeyAction runs inside the keyboard hook callback and must return at once.
+func (a *app) hotkeyAction(c hotkey.Combo) (hotkey.Action, bool) {
+	action, ok := (*a.bindings.Load())[c]
+	return action, ok
+}
+
+// The virtual-key codes of the media keys.
+const (
+	vkMediaNext      = 0xB0
+	vkMediaPrevious  = 0xB1
+	vkMediaPlayPause = 0xB3
+)
+
+func (a *app) handleHotkeys() {
+	for ev := range a.keys {
+		// The keys are still held: a lone Win would open the Start menu once released, and a lone Alt would focus the menu bar of the foreground app.
+		if ev.Combo.Mods&(hotkey.Win|hotkey.Alt) != 0 {
+			win32.SendMaskKey()
+		}
+		at := win32.CursorPos()
+		switch ev.Action {
+		case hotkey.VolumeUp:
+			a.stepVolume(1, at)
+		case hotkey.VolumeDown:
+			a.stepVolume(-1, at)
+		case hotkey.ToggleMute:
+			a.toggleMute(at)
+		case hotkey.BrightnessUp:
+			a.stepBrightness(1, false, at)
+		case hotkey.BrightnessDown:
+			a.stepBrightness(-1, false, at)
+		case hotkey.PlayPause:
+			win32.SendKeyPress(vkMediaPlayPause)
+		case hotkey.NextTrack:
+			win32.SendKeyPress(vkMediaNext)
+		case hotkey.PreviousTrack:
+			win32.SendKeyPress(vkMediaPrevious)
+		case hotkey.NextDevice:
+			a.nextDevice(at)
+		}
+	}
+}
+
+// trayDevices runs on MyGo's main thread as the tray menu opens.
+func (a *app) trayDevices() []tray.Device {
+	devices, err := a.audio.Devices()
+	if err != nil {
+		log.Printf("listing devices: %v", err)
+		return nil
+	}
+	out := make([]tray.Device, len(devices))
+	for i, d := range devices {
+		out[i] = tray.Device{ID: d.ID, Name: d.Name, Default: d.Default}
+	}
+	return out
+}
+
+func (a *app) selectDevice(id string) {
+	if err := a.audio.SetDefault(id); err != nil {
+		a.deviceSwitchFailed(err)
+	}
+}
+
+func (a *app) nextDevice(at win32.Point) {
+	if _, err := a.audio.NextDevice(); err != nil {
+		if errors.Is(err, audio.ErrNoDevice) {
+			a.showVolume(audio.State{}, err, at)
+			return
+		}
+		a.deviceSwitchFailed(err)
+		return
+	}
+	st, err := a.audio.Current()
+	a.showVolume(st, err, at)
+}
+
+// deviceSwitchFailed tells the user and opens the sound settings of Windows, where the device can be chosen by hand. IPolicyConfig, which Volm switches with, is undocumented and could stop working after an update of Windows.
+func (a *app) deviceSwitchFailed(err error) {
+	log.Printf("switching device: %v", err)
+	n := mygo.NewNotification(mygo.NotificationOptions{
+		Title: "出力デバイスを切り替えられませんでした",
+		Body:  "Windows のサウンドの設定を開きます。そこで出力デバイスを選んでください。",
+	})
+	if err := n.Show(); err != nil {
+		log.Printf("notifying: %v", err)
+	}
+	if err := openURL("ms-settings:sound"); err != nil {
+		log.Printf("opening sound settings: %v", err)
+	}
 }

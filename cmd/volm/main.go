@@ -154,3 +154,13 @@ func openLog(path string) (closeLog func()) {
 	log.SetOutput(f)
 	return func() { _ = f.Close() }
 }
+
+// openURL opens a URL, such as a page of the Windows settings app, with its registered handler.
+func openURL(url string) error {
+	verb, _ := windows.UTF16PtrFromString("open")
+	target, err := windows.UTF16PtrFromString(url)
+	if err != nil {
+		return err
+	}
+	return windows.ShellExecute(0, verb, target, nil, nil, windows.SW_SHOWNORMAL)
+}
