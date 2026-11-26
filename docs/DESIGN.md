@@ -7,7 +7,7 @@ Volm は、タスクバー上のマウスホイールで音量を、Ctrl+ホイ�
 - リポジトリ: github.com/otnc/Volm (Go のモジュールパスも同じ)
 - 作者: otoneko.
 - 配布: Inno Setup のインストーラーと GitHub Releases
-- 文書の状態: 初版 (2026-11-25)。「要検証」と書いた項目は PoC で確かめてから確定する
+- 文書の状態: 2026-11-26 時点で、8 章の M1〜M5 をすべて実装した。7 章は、実装の前に行った PoC の記録である
 
 ## 1. 目的と範囲
 
@@ -75,7 +75,7 @@ HMONITOR と WMI のインスタンスは、`EnumDisplayDevices` に `EDD_GET_DE
 | HP 2009 (HWP2827) | 外部 | 対象外 | 応答なし |
 | TOSHIBA LCB2005V (TSB0209) | 外部 | 対象外 | 応答なし |
 
-内蔵パネルは WMI で変えられる見込みが高い。外部の 2 台は `GetMonitorBrightness` と VCP 0x10 の読み取りがどちらも失敗した。原因の候補は、モニターのメニューで DDC/CI がオフになっていること、変換アダプターやドック経由の接続、テレビ系の機種で DDC/CI に対応していないこと、である (要検証)。DDC/CI が使えない場合も、ソフト減光で暗くすることはできる。
+内蔵パネルは WMI で変えられた (PoC 3)。外部の 2 台は `GetMonitorBrightness` と VCP 0x10 の読み取りがどちらも失敗した。原因の候補は、モニターのメニューで DDC/CI がオフになっていること、変換アダプターやドック経由の接続、テレビ系の機種で DDC/CI に対応していないこと、である (要検証)。DDC/CI が使えない場合も、ソフト減光で暗くすることはできる。
 
 ### 2.4 アプリ別音量
 
@@ -139,7 +139,7 @@ Win を含む組み合わせを処理したら、Win が押されている間に
 - アイコン: 音量に応じて 4 段階 (ミュート、低、中、高) に切り替える
 - ツールチップ: `音量 40% / スピーカー (Realtek)` のように音量と既定デバイス名を出す
 - 左クリック: 設定画面を開く
-- 右クリックのメニュー: ミュート (チェック)、出力デバイス (サブメニュー、ラジオ)、設定、更新を確認、終了
+- 右クリックのメニュー: ミュート (チェック)、出力デバイス (サブメニュー、ラジオ)、設定、終了。出力デバイスの一覧は、メニューを開くたびに作り直す
 
 MyGo v0.10.0 は `TaskbarCreated` を受け取ると、トレイアイコンを登録し直す (ソースで確認した)。Explorer を再起動したときの動作は、実機ではまだ確かめていない。
 
@@ -237,9 +237,9 @@ MyGo は 2026-11 時点で v0.10.0 であり、1.0 前なので API が変わり
 
 Volm は常駐プロセスと設定プロセスの 2 つに分かれる。どちらも同じ `volm.exe` で、引数の `--settings` で役割を変える。
 
-常駐プロセスは `RequestSingleInstanceLock` で多重起動を防ぐ。2 つ目を起動したときと、トレイの左クリックや「設定」を選んだときは、設定プロセスを起動する。設定プロセスがすでに開いていれば、新しく起動せずにそのウィンドウを前面に出す。設定プロセスは別の名前で `RequestSingleInstanceLock` を呼び、多重起動を防ぐ。
+常駐プロセスは `RequestSingleInstanceLock` で多重起動を防ぐ。2 つ目を起動したときと、トレイの左クリックや「設定」を選んだときは、設定プロセスを起動する。設定プロセスがすでに開いていれば、新しく起動せずにそのウィンドウを前面に出す。設定プロセスは名前付きミューテックス (`Local\VolmSettings`) で多重起動を防ぐ。MyGo の `RequestSingleInstanceLock` は使わない。使うには MyGo のアプリ名を変える必要があり、そうすると `SetOpenAtLogin` が使う Run の値の名前まで変わってしまうためである。
 
-設定プロセスは `config.json` を書き換えるだけで、常駐プロセスと直接は通信しない。常駐プロセスは `config.json` の変更を監視し、変わったら読み直して反映する。ホットキーの入力欄にフォーカスがある間は、設定プロセスが自分の低レベルキーボードフックでキー入力を受け取る。低レベルフックはあとから登録したものが先に呼ばれるので、常駐プロセスのホットキーより先にキーを受け取れる見込みである (要検証)。
+設定の変更は `config.json` を通して伝える。設定プロセスは `config.json` を書き換え、常駐プロセスはその変更を監視して読み直す。常駐プロセスに直接頼むのは、終了と再起動だけである (2.9 の名前付きイベント)。ホットキーを記録している間は、設定プロセスが自分の低レベルキーボードフックでキー入力を受け取る。低レベルフックはあとから登録したものが先に呼ばれるので、常駐プロセスのホットキーとして割り当て済みの組み合わせも、実行されずに記録される (実装で確かめた)。
 
 常駐プロセスのスレッド構成は次のとおり。
 
@@ -276,19 +276,27 @@ MyGo のアプリは、`OnWindowAllClosed` にリスナーがないと、最後�
 ### 3.3 ディレクトリ構成
 
 ```
-cmd/volm/            エントリポイント
-internal/hook/       低レベルマウス・キーボードフック、タスクバー判定
-internal/audio/      Core Audio (音量、ミュート、セッション、デバイス切り替え)
-internal/brightness/ モニター列挙、WMI、DDC/CI、ソフト減光
-internal/taskbar/    UI Automation でタスクバーのボタンからアプリを特定
-internal/osd/        OSD ウィンドウ
-internal/tray/       トレイアイコンとメニュー
-internal/settings/   設定画面
-internal/config/     設定の読み書き、初期値
-internal/update/     GitHub Releases の確認、ダウンロード、インストーラー起動
-internal/media/      メディアキー送信
-installer/volm.iss   Inno Setup スクリプト
-docs/                設計書など
+cmd/volm/             エントリポイント (常駐プロセスと設定プロセス)
+internal/appid/       プロセスの実行ファイルと AUMID、アプリと音声セッションの照合
+internal/audio/       Core Audio (音量、ミュート、出力デバイス、アプリごとのセッション)
+internal/brightness/  モニターの列挙、WMI、DDC/CI、画面を暗く重ねる覆い
+internal/config/      設定ファイルの読み書きと初期値
+internal/control/     ホイールのノッチの集計、変化量の計算
+internal/hook/        低レベルマウス・キーボードフック、タスクバーとタイトルバーの判定
+internal/hotkey/      キーの組み合わせの読み書き、操作の一覧
+internal/ipc/         設定プロセスから常駐プロセスへの終了の依頼
+internal/osd/         OSD ウィンドウ (Win32 と GDI)
+internal/settings/    設定画面 (MyGo のネイティブ UI)
+internal/taskbar/     UI Automation でタスクバーのボタンからアプリを特定
+internal/tray/        トレイアイコンとメニュー
+internal/update/      GitHub Releases の確認、ダウンロード、インストーラーの起動
+internal/win32/       直接呼ぶ Win32 API の宣言
+tools/genicons/       アイコンとロゴの生成
+tools/gennotices/     THIRD_PARTY_NOTICES.md の生成
+scripts/              CI とリリースのスクリプト、インストーラーのビルド
+installer/volm.iss    Inno Setup のスクリプト
+assets/               アイコンとロゴ (tools/genicons が書き出す)
+docs/                 設計書
 ```
 
 ### 3.4 設定ファイル
@@ -298,19 +306,21 @@ docs/                設計書など
 ```json
 {
   "version": 1,
-  "volume": { "step": 2, "unmuteOnIncrease": true, "middleClickMute": true, "appVolumeWithAlt": true },
+  "volume": {
+    "wheelEnabled": true, "step": 2, "unmuteOnIncrease": true, "middleClickMute": true,
+    "appVolumeWithAlt": true, "appVolumeOnTitleBar": true
+  },
   "brightness": {
-    "step": 5,
-    "softDimMin": 20,
-    "monitors": { "MONITOR\\HWP2827\\...": { "method": "auto" } }
+    "wheelEnabled": true, "step": 5, "softDimMin": 20,
+    "monitors": { "\\?\\DISPLAY#HWP2827#4&1227b4ea&0&UID8261#{e6f07b5f-...}": { "method": "softDim" } }
   },
   "osd": { "enabled": true, "position": "bottomRight", "durationMs": 1500 },
-  "hotkeys": { "volumeUp": ["Win+Up"], "volumeDown": ["Win+Down"], "playPause": ["Ctrl+Shift+Q"], "nextTrack": ["Ctrl+Shift+E"] },
-  "update": { "checkOnStartup": true, "prerelease": false, "lastCheckedAt": "2026-11-25T00:00:00Z" }
+  "hotkeys": { "volumeUp": ["Win+Up"], "volumeDown": ["Win+Down"], "toggleMute": [], "playPause": ["Ctrl+Shift+Q"], "nextTrack": ["Ctrl+Shift+E"] },
+  "update": { "checkOnStartup": true, "prerelease": false, "lastCheckedAt": "2026-11-26T00:00:00Z" }
 }
 ```
 
-`version` は設定の形式のバージョンで、形式を変えたときに移行処理を書くために使う。ログイン時の起動は設定ファイルに持たず、MyGo の `SetOpenAtLogin` / `OpenAtLogin` (HKCU の Run) を正とする。
+`version` は設定の形式のバージョンで、形式を変えたときに移行処理を書くために使う。`monitors` のキーは、モニターのデバイスインターフェース名である。`hotkeys` で割り当てを外した操作は、キーを消さずに空の配列として残す。キーがない操作は、読み込むときに初期値の割り当てに戻るためである。ログイン時の起動は設定ファイルに持たず、MyGo の `SetOpenAtLogin` / `OpenAtLogin` (HKCU の Run) を正とする。
 
 ログは `%APPDATA%\Volm\volm.log` に書き、1MB を超えたら 1 世代だけ残して切り替える。
 
