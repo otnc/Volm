@@ -14,6 +14,10 @@ func TestTakes(t *testing.T) {
 	withMiddle := config.Default()
 	withoutMiddle := config.Default()
 	withoutMiddle.Volume.MiddleClickMute = false
+	volumeOff := config.Default()
+	volumeOff.Volume.WheelEnabled = false
+	brightnessOff := config.Default()
+	brightnessOff.Brightness.WheelEnabled = false
 
 	tests := []struct {
 		name string
@@ -27,6 +31,10 @@ func TestTakes(t *testing.T) {
 		{"ctrl wheel for brightness", withMiddle, hook.Event{Kind: hook.Wheel, OnTaskbar: true, Ctrl: true}, true},
 		{"ctrl shift wheel for every monitor", withMiddle, hook.Event{Kind: hook.Wheel, OnTaskbar: true, Ctrl: true, Shift: true}, true},
 		{"alt wheel is left for per-app volume", withMiddle, hook.Event{Kind: hook.Wheel, OnTaskbar: true, Alt: true}, false},
+		{"wheel with volume control off", volumeOff, hook.Event{Kind: hook.Wheel, OnTaskbar: true}, false},
+		{"ctrl wheel with volume control off", volumeOff, hook.Event{Kind: hook.Wheel, OnTaskbar: true, Ctrl: true}, true},
+		{"ctrl wheel with brightness control off", brightnessOff, hook.Event{Kind: hook.Wheel, OnTaskbar: true, Ctrl: true}, false},
+		{"wheel with brightness control off", brightnessOff, hook.Event{Kind: hook.Wheel, OnTaskbar: true}, true},
 		{"middle click on taskbar", withMiddle, hook.Event{Kind: hook.MiddleClick, OnTaskbar: true}, true},
 		{"middle click with the setting off", withoutMiddle, hook.Event{Kind: hook.MiddleClick, OnTaskbar: true}, false},
 		{"middle click elsewhere", withMiddle, hook.Event{Kind: hook.MiddleClick}, false},

@@ -45,6 +45,8 @@ type Config struct {
 
 // Volume holds the settings of the wheel and middle click on the taskbar.
 type Volume struct {
+	// WheelEnabled lets the wheel over the taskbar change the volume. Off, Volm leaves the wheel to other apps; hotkeys still work.
+	WheelEnabled     bool `json:"wheelEnabled"`
 	Step             int  `json:"step"`
 	UnmuteOnIncrease bool `json:"unmuteOnIncrease"`
 	MiddleClickMute  bool `json:"middleClickMute"`
@@ -53,7 +55,9 @@ type Volume struct {
 
 // Brightness holds the settings of Ctrl+wheel on the taskbar.
 type Brightness struct {
-	Step int `json:"step"`
+	// WheelEnabled lets Ctrl+wheel over the taskbar change the brightness. Off, Volm leaves it to other apps; hotkeys still work.
+	WheelEnabled bool `json:"wheelEnabled"`
+	Step         int  `json:"step"`
 	// SoftDimMin is the darkest the dimming overlay may go, in percent, so that a monitor never turns too dark to use.
 	SoftDimMin int `json:"softDimMin"`
 	// Monitors is keyed by the monitor's device interface name.
@@ -85,12 +89,13 @@ func Default() Config {
 	return Config{
 		Version: CurrentVersion,
 		Volume: Volume{
+			WheelEnabled:     true,
 			Step:             2,
 			UnmuteOnIncrease: true,
 			MiddleClickMute:  true,
 			AppVolumeWithAlt: true,
 		},
-		Brightness: Brightness{Step: 5, SoftDimMin: 20, Monitors: map[string]Monitor{}},
+		Brightness: Brightness{WheelEnabled: true, Step: 5, SoftDimMin: 20, Monitors: map[string]Monitor{}},
 		OSD:        OSD{Enabled: true, Position: PositionBottomRight, DurationMs: 1500},
 		Hotkeys: map[string][]string{
 			"volumeUp":   {"Win+Up"},

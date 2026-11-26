@@ -17,6 +17,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/otnc/Volm/internal/config"
+	"github.com/otnc/Volm/internal/ipc"
 	"github.com/otnc/Volm/internal/settings"
 	"github.com/otnc/Volm/internal/win32"
 	"golang.org/x/sys/windows"
@@ -50,6 +51,8 @@ func runResident(configPath string) {
 	defer closeLog()
 	log.Printf("Volm %s starting", mygo.App.Version())
 
+	_, statErr := os.Stat(configPath)
+	firstRun := errors.Is(statErr, os.ErrNotExist)
 	cfg, err := config.Load(configPath)
 	settingsReset := errors.Is(err, config.ErrRecovered)
 	switch {
@@ -64,6 +67,13 @@ func runResident(configPath string) {
 		}
 	}
 
+	stopListening, err := ipc.ListenQuit(mygo.App.Quit)
+	if err != nil {
+		log.Printf("listening for quit requests: %v", err)
+	} else {
+		defer stopListening()
+	}
+
 	a := newApp(configPath, cfg)
 	mygo.App.OnWindowAllClosed(func() {}) // Volm lives in the tray and opens no windows of its own.
 	mygo.App.OnSecondInstance(func([]string, string) { openSettings() })
@@ -75,6 +85,12 @@ func runResident(configPath string) {
 		}
 		if settingsReset {
 			go notifySettingsReset(configPath)
+		}
+		// Starting at login is on by default. The installer sets it; a copy run without one sets it on its first start. A development build would register its temporary executable, so it does not.
+		if firstRun && !mygo.IsDev() {
+			if err := mygo.App.SetOpenAtLogin(true); err != nil {
+				log.Printf("turning on start at login: %v", err)
+			}
 		}
 	})
 	if err := mygo.App.Run(); err != nil {

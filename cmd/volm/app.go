@@ -105,11 +105,19 @@ func (a *app) takes(ev hook.Event) bool {
 	if !ev.OnTaskbar {
 		return false
 	}
+	cfg := a.cfg.Load()
 	switch ev.Kind {
 	case hook.Wheel:
-		return !ev.Alt
+		switch {
+		case ev.Alt:
+			return false
+		case ev.Ctrl:
+			return cfg.Brightness.WheelEnabled
+		default:
+			return cfg.Volume.WheelEnabled
+		}
 	case hook.MiddleClick:
-		return a.cfg.Load().Volume.MiddleClickMute
+		return cfg.Volume.MiddleClickMute
 	}
 	return false
 }
