@@ -1,0 +1,11 @@
+{
+  "name": "Volm",
+  "identifier": "io.github.otnc.volm",
+  "version": "0.1.0",
+  "copyright": "© 2026 otoneko.",
+  "publisher": "otoneko.",
+  "license": "GPL-3.0-only",
+  "icon": "assets/icon.png",
+  "main": "./cmd/volm",
+  "out": "build"
+}
