@@ -62,6 +62,7 @@ type window struct {
 	methodChoice map[string]string // the label chosen in each monitor's menu
 
 	openAtLogin  bool
+	uninstaller  string // "" when this copy of Volm was not installed by the installer
 	confirmReset bool
 	errorText    string
 	noticeText   string
@@ -78,6 +79,7 @@ func Open(path string, cfg config.Config) {
 	w.logo, _ = ui.DecodeImage(logoPNG)
 	w.load(cfg)
 	w.openAtLogin = mygo.App.OpenAtLogin()
+	w.uninstaller = findUninstaller()
 	win := mygo.NewWindow(mygo.WindowOptions{
 		Title:     WindowTitle,
 		Width:     800,
@@ -260,6 +262,17 @@ func (w *window) generalPage(c *ui.Context) {
 			w.quitResident()
 		}
 	})
+	if w.uninstaller != "" {
+		row(c, w.icons.uninstall, "Volm をアンインストールする", "アンインストーラーを起動して、この画面を閉じます。常駐している Volm は、アンインストールを始めたときに終了します。", func() {
+			if ui.Button(c, "アンインストール").Clicked() {
+				w.uninstall(w.uninstaller)
+			}
+		})
+	} else {
+		row(c, w.icons.uninstall, "Volm をアンインストールする", "インストーラーで入れた Volm だけを、ここからアンインストールできます。zip から入れた場合は、Volm を終了してからフォルダーごと削除してください。", func() {
+			ui.Button(c, "アンインストール").Disabled(true)
+		})
+	}
 }
 
 // restartResident asks the resident process to quit and starts a new one. MyGo's instance lock makes the new one wait until the old one has exited.
@@ -432,7 +445,7 @@ type icons struct {
 	tune, volumeUp, volumeOff, osd, info, restart, mouse,
 	timer, position, visibility, code, gavel, person, login, restartApp, quit, apps, titleBar, update, science,
 	brightness, brightnessLow, monitor,
-	keyboard, add, close *ui.SVG
+	keyboard, add, close, uninstall *ui.SVG
 }
 
 // loadIcons parses the Material Symbols (Rounded) icons in icons/.
@@ -467,6 +480,7 @@ func loadIcons() icons {
 		science:       svg("science"),
 		add:           svg("add"),
 		close:         svg("close"),
+		uninstall:     svg("delete"),
 		visibility:    svg("visibility"),
 		code:          svg("code"),
 		gavel:         svg("gavel"),

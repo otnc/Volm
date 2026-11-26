@@ -139,16 +139,13 @@ begin
   Result := '';
 end;
 
-function InitializeUninstall(): Boolean;
-begin
-  QuitRunningVolm();
-  Result := True;
-end;
-
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   DataDir: String;
 begin
+  { Volm quits once the user has confirmed, not before: cancelling the uninstall leaves it running. }
+  if CurUninstallStep = usUninstall then
+    QuitRunningVolm();
   if CurUninstallStep <> usPostUninstall then
     Exit;
   DataDir := ExpandConstant('{userappdata}\Volm');
