@@ -111,7 +111,8 @@ func (a *app) stop() {
 
 // takes runs inside the mouse hook callback and must return at once. Alt with the wheel is left to other apps until per-app volume takes it.
 func (a *app) takes(ev hook.Event) bool {
-	if !ev.OnTaskbar && !(ev.OnTitleBar && ev.Kind == hook.Wheel) {
+	overTitleBarWheel := ev.OnTitleBar && ev.Kind == hook.Wheel
+	if !ev.OnTaskbar && !overTitleBarWheel {
 		return false
 	}
 	cfg := a.cfg.Load()
