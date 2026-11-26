@@ -38,7 +38,9 @@ jobs:
         with:
           version: v2.15.0
       - run: go mod tidy -diff
-      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
+      # Built for the runner, then run with GOOS=windows to analyze the Windows build.
+      - run: GOOS= GOARCH= go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
+      - run: "$(go env GOPATH)/bin/govulncheck ./..."
 
   generated:
     runs-on: ubuntu-latest
