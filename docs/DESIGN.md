@@ -333,10 +333,11 @@ Inno Setup 6 で作る。MyGo の `mygo build -skip-installer` で出力した�
 - `AppId=Volm` とする。Inno Setup はこの値でインストール済みのアプリを見分け、アップデートで同じアプリとして上書きする。アンインストール情報のキー名 (`Volm_is1`) にもなるので、リリース後は変えない
 - `AppPublisher=otoneko.`、`LicenseFile` に GPL-3.0 の全文を指定する
 - 言語: `compiler:Languages\Japanese.isl`
-- タスク: 「Windows 起動時に起動する」(初期値オン)、「デスクトップにショートカットを作る」(初期値オフ)
+- タスク: 「Windows 起動時に起動する」(初期値オン。最初のインストールのときだけ表示する)、「デスクトップにショートカットを作る」(初期値オフ)
 - 「Windows 起動時に起動する」は、MyGo の `SetOpenAtLogin` と同じ形で HKCU の Run に登録する。値の名前は `mygo.json` の `identifier` (`io.github.otnc.volm`)、値は `"{app}\Volm.exe" --mygo-opened-at-login` とする。形が違うと、設定画面のスイッチがオフのように見える
 - `SetupIconFile` には `assets/volm.ico` を使う
-- 実行中の Volm は、インストール前に終了させる (`AppMutex` と `CloseApplications`)
+- 実行中の Volm は、インストールの最初 (`InitializeSetup`) に、設定画面の「終了」と同じ名前付きイベントで終了を頼み、常駐プロセスが持つミューテックス (`VolmRunning`) が消えるまで待つ。`AppMutex` は使わない。Inno Setup は `[Code]` より先に `AppMutex` を確かめ、サイレントインストール (アップデート) ではそこで中止してしまうためである。終了しないときは、通常のインストールでは閉じるよう頼んで再試行でき、サイレントインストールでは中止する
+- Run への登録は最初のインストールのときだけ行う。アップデートでは、設定画面で選んだ状態を変えない
 - `[Run]` に Volm を `postinstall nowait` で置き、通常のインストールでは完了画面のチェックで、サイレントインストール (自動更新) では自動で起動する
 - アンインストール時: HKCU の Run から Volm を削除する。`%APPDATA%\Volm` を削除するかはダイアログで確認する
 

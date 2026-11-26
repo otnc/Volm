@@ -39,8 +39,7 @@ OutputBaseFilename=Volm-Setup-{#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-; Volm holds this mutex while it runs. The [Code] below asks it to quit first; this is the fallback that tells the user.
-AppMutex=VolmRunning
+; No AppMutex: Inno Setup checks it before any [Code] runs and, in a silent update, cancels at once. InitializeSetup below asks a running Volm to quit first instead.
 CloseApplications=yes
 RestartApplications=no
 
@@ -48,7 +47,7 @@ RestartApplications=no
 Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
 
 [Tasks]
-Name: "startup"; Description: "Windows の起動時に Volm を起動する"; GroupDescription: "そのほかの設定:"
+Name: "startup"; Description: "Windows の起動時に Volm を起動する"; GroupDescription: "そのほかの設定:"; Check: not IsUpdate
 Name: "desktopicon"; Description: "デスクトップにショートカットを作る"; GroupDescription: "そのほかの設定:"; Flags: unchecked
 
 [Files]
@@ -63,7 +62,8 @@ Name: "{autodesktop}\Volm"; Filename: "{app}\Volm.exe"; Tasks: desktopicon
 
 [Registry]
 ; The same Run entry as MyGo's SetOpenAtLogin writes, so that the switch in the settings window shows it: the value is named after mygo.json's identifier, and the command carries MyGo's login argument.
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "io.github.otnc.volm"; ValueData: """{app}\Volm.exe"" --mygo-opened-at-login"; Tasks: startup; Flags: uninsdeletevalue
+; Written on the first install only: on an update, the choice made since in the settings window stands.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "io.github.otnc.volm"; ValueData: """{app}\Volm.exe"" --mygo-opened-at-login"; Tasks: startup; Check: not IsUpdate; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{app}\Volm.exe"; Description: "Volm を起動する"; Flags: postinstall nowait skipifsilent
@@ -103,6 +103,33 @@ begin
   begin
     Sleep(100);
     Waited := Waited + 100;
+  end;
+end;
+
+{ True when Volm is installed already, so this setup updates it. }
+function IsUpdate(): Boolean;
+begin
+  Result := RegValueExists(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Volm_is1', 'UninstallString');
+end;
+
+{ Asks a running Volm to quit before anything else. When it does not, an interactive setup asks the user to close it and try again; a silent one, as an update runs, gives up. }
+function InitializeSetup(): Boolean;
+begin
+  Result := True;
+  QuitRunningVolm();
+  while CheckForMutexes(RunningMutexName) do
+  begin
+    if WizardSilent() then
+    begin
+      Result := False;
+      Exit;
+    end;
+    if MsgBox('Volm が終了しませんでした。トレイのメニューの「終了」で Volm を終了してから、「再試行」を押してください。', mbError, MB_RETRYCANCEL) = IDCANCEL then
+    begin
+      Result := False;
+      Exit;
+    end;
+    QuitRunningVolm();
   end;
 end;
 
