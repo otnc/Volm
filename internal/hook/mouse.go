@@ -108,7 +108,7 @@ func (h *mouseHook) handleMessage(message uintptr, info *win32.MSLLHookStruct) b
 	}
 	ev.Pos = info.Pt
 	ev.OnTaskbar, ev.Window = h.taskbar.at(info.Pt)
-	if !ev.OnTaskbar && ev.Window != 0 {
+	if !ev.OnTaskbar && ev.Window != 0 && !h.taskbar.isDesktop {
 		ev.OnTitleBar = win32.OnTitleBar(ev.Window, info.Pt)
 	}
 	ev.Ctrl = win32.KeyDown(win32.VK_CONTROL)
@@ -132,6 +132,8 @@ type taskbarCache struct {
 	hwnd      uintptr
 	root      uintptr
 	isTaskbar bool
+	// isDesktop is set over the desktop, a window as large as the screen whose top edge is not a title bar.
+	isDesktop bool
 }
 
 // at reports whether pt is on a taskbar, and the top-level window under pt.
@@ -142,7 +144,9 @@ func (c *taskbarCache) at(pt win32.Point) (isTaskbar bool, root uintptr) {
 	}
 	c.hwnd = hwnd
 	c.root = win32.Root(hwnd)
-	c.isTaskbar = IsTaskbarClass(win32.RootClass(hwnd))
+	class := win32.RootClass(hwnd)
+	c.isTaskbar = IsTaskbarClass(class)
+	c.isDesktop = class == "Progman" || class == "WorkerW"
 	return c.isTaskbar, c.root
 }
 
