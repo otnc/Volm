@@ -1,0 +1,39 @@
+name: 不具合の報告
+description: Volm の動きがおかしいときに報告する
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        報告ありがとうございます。できるだけ詳しく書いていただけると、原因を探しやすくなります。
+  - type: input
+    attributes:
+      label: Volm のバージョン
+      description: 設定画面の「情報」ページに表示されます。
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Windows のバージョン
+      placeholder: Windows 11 24H2 (x64)
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 起きたことと、そのときの操作
+      description: どこで何を操作したら何が起きたかを、順に書いてください。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 本来はどうなってほしいか
+  - type: textarea
+    attributes:
+      label: ログ
+      description: "`%APPDATA%\Volm\volm.log` の、問題が起きた時刻のあたりを貼ってください。"
+      render: text
+  - type: textarea
+    attributes:
+      label: そのほかの情報
+      description: モニターの台数と接続のしかた、使っているマウスやタッチパッド、スクリーンショットなど。

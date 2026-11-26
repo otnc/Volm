@@ -60,7 +60,7 @@ VOLM_INTEGRATION=1 go test ./internal/audio/
 
 ## コードの決まり
 
-- `gofmt` で整形し、`go vet ./...` を通してください。COM のオブジェクトや低レベルフックで Windows から渡されたポインターを扱う箇所では、`possible misuse of unsafe.Pointer` の警告が出ます。この警告は想定どおりです。
+- `gofmt` で整形し、`go vet -unsafeptr=false ./...` と `golangci-lint run` を通してください。COM のオブジェクトや低レベルフックでは、Windows から `uintptr` で渡されたポインターを扱うので、`unsafeptr` の検査は外しています。golangci-lint の設定は `.golangci.yml` にあります。
 - ソースファイルの先頭には、次の 2 行を入れてください。
 
   ```go
@@ -72,6 +72,25 @@ VOLM_INTEGRATION=1 go test ./internal/audio/
 - 名前で意味が伝わるようにし、コメントは名前だけではわからないことにだけ書きます。外から使う型と関数には、godoc の形式で使い方を書きます。
 - コメントと文書は、文の途中で改行しません。改行するのは、段落や箇条書きの区切りだけにします。
 - 低レベルフックのコールバックには、時間のかかる処理を書かないでください。Windows は、一定の時間内に戻らないフックを予告なしに外します。COM の呼び出しなどは、フックからチャネルでイベントを受け取る goroutine で行います。
+
+## CI
+
+プッシュとプルリクエストのたびに、GitHub Actions の `CI` が次を確かめます。
+
+| ジョブ | 内容 |
+|---|---|
+| lint | `gofmt`、`go vet`、golangci-lint、`go mod tidy -diff`、govulncheck。Windows 向けのビルドとして解析します |
+| generated | アイコン、ロゴ、`THIRD_PARTY_NOTICES.md` を生成し直し、コミットされたものと同じかを確かめます |
+| test | Windows で `go test -race ./...` と `go tool mygo build -skip-installer` を実行し、`Volm.exe` を成果物として残します |
+| release-rules | リリースのバージョンを決めるスクリプトのテスト |
+
+生成ファイルが古いと言われたら、`bash scripts/check-generated.sh` を手元で実行し、変わったファイルをコミットしてください。
+
+## リリース
+
+リリースは、GitHub Actions の `release` を `main` から手動で実行して作ります。`version` には `patch`、`minor`、`major`、`prerelease` のどれか、または `1.2.0` のようなバージョンを入れます。`preid` には `rc` のようなプレリリースの識別子を入れられます。
+
+`release` は、次のバージョンのタグを決め、`CI` と同じ検査を通してから、Windows で `Volm.exe` を作ります。実行ファイルのバージョンはタグから決まるので、`mygo.json` の `version` を書き換える必要はありません。最後にタグを付け、`Volm-<バージョン>-windows-amd64.zip` と `SHA256SUMS` を付けた GitHub Release を作ります。インストーラーは、まだリリースに含めていません。
 
 ## コミットとプルリクエスト
 

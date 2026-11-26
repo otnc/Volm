@@ -1,0 +1,18 @@
+name: 機能の提案
+description: Volm に足したい機能や、変えたい動きを提案する
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提案ありがとうございます。設計書の「対象にしないもの」に入っている機能は、取り込まないことがあります。
+  - type: textarea
+    attributes:
+      label: 提案する機能
+      description: 何ができるようになってほしいかを書いてください。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 困っていることや使う場面
+      description: その機能があると、どんな場面で何が楽になるかを書いてください。
