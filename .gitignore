@@ -1,5 +1,8 @@
 # Build output
 *.exe
 
-# PoC run logs
-poc/**/*.log
+# Local instructions for Claude Code
+CLAUDE.local.md
+
+# mygo build output
+build/
