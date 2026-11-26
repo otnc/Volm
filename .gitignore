@@ -1,0 +1,5 @@
+# Build output
+*.exe
+
+# PoC run logs
+poc/**/*.log
