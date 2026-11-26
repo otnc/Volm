@@ -145,3 +145,37 @@ func waitForChange(t *testing.T, ep *Endpoint, match func(State) bool) {
 		}
 	}
 }
+
+func TestNextDeviceCyclesAndRestores(t *testing.T) {
+	ep := openForTest(t)
+	devices, err := ep.Devices()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devices) < 2 {
+		t.Skip("needs two active playback devices")
+	}
+	var original Device
+	for _, d := range devices {
+		if d.Default {
+			original = d
+		}
+	}
+	if original.ID == "" {
+		t.Fatal("no device is marked default")
+	}
+	t.Cleanup(func() {
+		if err := ep.SetDefault(original.ID); err != nil {
+			t.Errorf("restoring the default device: %v", err)
+		}
+	})
+
+	next, err := ep.NextDevice()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.ID == original.ID {
+		t.Fatalf("NextDevice stayed on %s", original.Name)
+	}
+	waitForChange(t, ep, func(st State) bool { return st.Device == next.Name })
+}
