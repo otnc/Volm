@@ -26,7 +26,11 @@ func ListenQuit(onQuit func()) (stop func(), err error) {
 		return nil, err
 	}
 	quit, err := windows.CreateEvent(nil, 0, 0, name)
-	if err != nil {
+	switch {
+	case errors.Is(err, windows.ERROR_ALREADY_EXISTS):
+		// A resident process that is shutting down can still hold the event when the next one starts, as on a restart. The handle is valid all the same; a request it left unanswered was meant for that process, so drop it.
+		_ = windows.ResetEvent(quit)
+	case err != nil:
 		return nil, err
 	}
 	stopEvent, err := windows.CreateEvent(nil, 1, 0, nil)
