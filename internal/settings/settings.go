@@ -250,6 +250,14 @@ func (w *window) generalPage(c *ui.Context) {
 			w.cfg.Volume.UnmuteOnIncrease = def.Volume.UnmuteOnIncrease
 		})
 	})
+	row(c, w.icons.fullscreen, "全画面のアプリの前では止める", "ゲームや動画を全画面で表示している間は、タスクバーのホイールをほかのアプリに渡し、OSD も表示しません。ホットキーは使えます。", func() {
+		if ui.Switch(c, &w.cfg.PauseInFullscreen).Label("全画面のアプリの前では止める").Changed() {
+			w.save()
+		}
+		w.resetButton(c, "全画面のアプリの前では止める", w.cfg.PauseInFullscreen == def.PauseInFullscreen, func() {
+			w.cfg.PauseInFullscreen = def.PauseInFullscreen
+		})
+	})
 
 	ui.Text(c, "Volm の動作").FontSize(16).Bold().Margin(12, 0, 0, 0)
 	row(c, w.icons.restartApp, "Volm を再起動する", "常駐している Volm を終了して、起動し直します。この画面は開いたままです。", func() {
@@ -443,7 +451,7 @@ var iconFiles embed.FS
 
 type icons struct {
 	tune, volumeUp, volumeOff, osd, info, restart, mouse,
-	timer, position, visibility, code, gavel, person, login, restartApp, quit, apps, titleBar, update, science,
+	timer, position, visibility, code, gavel, person, login, restartApp, quit, apps, titleBar, update, science, fullscreen,
 	brightness, brightnessLow, monitor,
 	keyboard, add, close, uninstall *ui.SVG
 }
@@ -478,6 +486,7 @@ func loadIcons() icons {
 		titleBar:      svg("web_asset"),
 		update:        svg("update"),
 		science:       svg("science"),
+		fullscreen:    svg("fullscreen"),
 		add:           svg("add"),
 		close:         svg("close"),
 		uninstall:     svg("delete"),
