@@ -95,7 +95,7 @@ func numberLayout(label string, size int) (metrics, image.Point) {
 		return image.Pt((size-m.width(label))/2, int(math.Round(min(scale.cy-h/2, bottom-h))))
 	}
 	// Half a pixel clear of the ring's inner edge, where its smoothed edge starts.
-	clear := scale.radius - scale.width/2 - 0.5
+	ringEdge := scale.radius - scale.width/2 - 0.5
 	m := metricsFor(scale.roomWidth(), int(bottom-top))
 	for h := int(bottom - top); h > 5; h-- {
 		m = metricsFor(scale.roomWidth(), h)
@@ -103,7 +103,7 @@ func numberLayout(label string, size int) (metrics, image.Point) {
 		box := image.Rect(at.X, at.Y, at.X+m.width("100"), at.Y+m.height)
 		fits := true
 		for _, c := range []image.Point{box.Min, {box.Max.X, box.Min.Y}, {box.Min.X, box.Max.Y}, box.Max} {
-			fits = fits && math.Hypot(float64(c.X)-scale.cx, float64(c.Y)-scale.cy) <= clear
+			fits = fits && math.Hypot(float64(c.X)-scale.cx, float64(c.Y)-scale.cy) <= ringEdge
 		}
 		if fits {
 			break
