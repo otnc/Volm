@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"image"
 	"image/png"
+	"math"
 	"strconv"
 	"testing"
 )
@@ -33,22 +34,35 @@ func TestLabel(t *testing.T) {
 	}
 }
 
-// TestEveryLabelFits checks that every volume, "100" included, is drawn with whole counters and that none of its pixels touches the scale or the speaker, at every size.
+// TestEveryLabelFits checks, for every volume and size, that the number has whole counters, and that the number with its outline stays clear of the speaker, a pixel inside the tile's edge and below the inner edge of the scale's top. It may cross the sides of the scale.
 func TestEveryLabelFits(t *testing.T) {
 	for _, size := range iconSizes {
 		scale := scaleFor(float64(size))
 		sp := speakerFor(scale)
-		others := []func(x, y float64) bool{scale.arc(scaleStart, scaleStart+scaleSweep), sp.body(), sp.wave(), sp.slash()}
+		speaker := []func(x, y float64) bool{sp.body(), sp.wave(), sp.slash()}
+		scaleTop := int(math.Ceil(scale.cy - scale.radius + scale.width/2))
+		o := outlineWidth(size)
 		for percent := range 101 {
 			label := strconv.Itoa(percent)
-			m, _ := numberLayout(label, size)
+			m, at := numberLayout(label, size)
 			if m.digit-2*m.stroke < 1 || m.counter < 1 {
 				t.Fatalf("size %d: a %d × %d px digit with %d px strokes has no counter", size, m.digit, m.height, m.stroke)
 			}
+			if at.Y < scaleTop {
+				t.Errorf("size %d: %s starts at row %d, over the scale's top, which ends at row %d", size, label, at.Y, scaleTop)
+			}
 			for _, p := range numberPixels(label, size) {
-				for _, other := range others {
-					if covers(other, p) {
-						t.Errorf("size %d: pixel %v of %s touches the scale or the speaker", size, p, label)
+				for dy := -o; dy <= o; dy++ {
+					for dx := -o; dx <= o; dx++ {
+						q := p.Add(image.Pt(dx, dy))
+						if q.X < 1 || q.Y < 1 || q.X >= size-1 || q.Y >= size-1 {
+							t.Fatalf("size %d: the outline of %s reaches %v, at the tile's edge", size, label, q)
+						}
+						for _, shape := range speaker {
+							if covers(shape, q) {
+								t.Fatalf("size %d: the outline of %s covers the speaker at %v", size, label, q)
+							}
+						}
 					}
 				}
 			}
@@ -162,12 +176,15 @@ func TestDrawSeparatesDigits(t *testing.T) {
 	}
 }
 
-// TestScaleFollowsVolume checks the amber fill of the scale against the middle of its left and right sides, which lie at 25% and 75% of its sweep.
+// TestScaleFollowsVolume checks the amber fill of the scale at two points below the number: 120° left and right of 12 o'clock, which lie at 6% and 94% of the sweep.
 func TestScaleFollowsVolume(t *testing.T) {
 	const size = 32
 	scale := scaleFor(size)
-	left := image.Pt(int(scale.cx-scale.radius), int(scale.cy))
-	right := image.Pt(int(scale.cx+scale.radius), int(scale.cy))
+	point := func(deg float64) image.Point {
+		rad := deg * math.Pi / 180
+		return image.Pt(int(scale.cx+scale.radius*math.Sin(rad)), int(scale.cy-scale.radius*math.Cos(rad)))
+	}
+	left, right := point(-120), point(120)
 	tests := []struct {
 		name                  string
 		percent               int
@@ -175,8 +192,8 @@ func TestScaleFollowsVolume(t *testing.T) {
 		leftAmber, rightAmber bool
 	}{
 		{"empty at 0%", 0, true, false, false, false},
-		{"left side at 50%", 50, true, false, true, false},
-		{"both sides at 100%", 100, true, false, true, true},
+		{"left end only at 50%", 50, true, false, true, false},
+		{"both ends at 100%", 100, true, false, true, true},
 		{"empty while muted", 100, true, true, false, false},
 		{"empty without a device", 100, false, false, false, false},
 	}
@@ -187,6 +204,20 @@ func TestScaleFollowsVolume(t *testing.T) {
 		}
 		if got := rgba(img, right) == rgba(fullAmber(), image.Point{}); got != tt.rightAmber {
 			t.Errorf("%s: right side amber = %v, want %v (%x)", tt.name, got, tt.rightAmber, rgba(img, right))
+		}
+	}
+}
+
+// TestOutlineHidesTheScale checks that the outline, in the tile's color, separates the number from the scale it crosses: the pixels just left and right of "100" at full volume, where the amber scale lies, are tile.
+func TestOutlineHidesTheScale(t *testing.T) {
+	for _, size := range iconSizes {
+		m, at := numberLayout("100", size)
+		img := Draw(100, true, false, size)
+		y := at.Y + m.height/2
+		for _, x := range []int{at.X - 1, at.X + m.width("100")} {
+			if got := rgba(img, image.Pt(x, y)); got != [4]uint8{0x3F, 0x3C, 0xBB, 0xFF} {
+				t.Errorf("size %d: outline pixel (%d, %d) is %x", size, x, y, got)
+			}
 		}
 	}
 }
