@@ -9,7 +9,7 @@
 //	internal/settings/appicon.png          128 px, for the settings window
 //	internal/settings/logo.png             the logo at twice the size the settings window shows it
 //
-// Run it from the repository root after changing the artwork. With -preview, it also writes a sheet that shows the logo on light and dark backgrounds and the tray icon, which internal/tray draws, at its real sizes:
+// Run it from the repository root after changing the artwork. With -preview, it also writes a sheet that shows the logo on light and dark backgrounds and the tray icon, which internal/trayicon draws, at its real sizes:
 //
 //	go run ./tools/genicons
 //	go run ./tools/genicons -preview preview.png

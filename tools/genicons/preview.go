@@ -8,7 +8,7 @@ import (
 	"image/color"
 	"image/draw"
 
-	"github.com/otnc/Volm/internal/tray"
+	"github.com/otnc/Volm/internal/trayicon"
 )
 
 // previewSheet lays out what to check after changing the artwork: the logo on a light and a dark background, the icon large, and tray icons for a few volumes at 16 and 24 px (100% and 150% scale), at their real size and enlarged without smoothing, on both kinds of taskbar.
@@ -53,7 +53,7 @@ func previewSheet() *image.NRGBA {
 		fill(sheet, image.Rect(0, y, width, y+trayRowH), bg)
 		x := pad
 		for _, s := range samples {
-			small := tray.Draw(s.label, s.muted, s.size)
+			small := trayicon.Draw(s.label, s.muted, s.size)
 			paste(sheet, small, image.Pt(x, y+pad))
 			paste(sheet, enlarge(small, zoom), image.Pt(x+trayPx+trayGap/2, y+pad))
 			x += trayPx + trayGap/2 + s.size*zoom + trayGap

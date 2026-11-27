@@ -1,7 +1,8 @@
 // Copyright (C) 2026 otoneko.
 // SPDX-License-Identifier: GPL-3.0-only
 
-package tray
+// Package trayicon draws the tray icon: the volume as a number on a tile. It does no Windows calls, so tools/genicons can draw the icon on any OS.
+package trayicon
 
 import (
 	"bytes"
@@ -37,7 +38,7 @@ func Label(percent int, hasDevice bool) string {
 //
 // The digits are drawn from segments on whole pixels instead of from a font, so that "100" still reads at 16 px:
 //
-//	img := tray.Draw("40", false, 20)
+//	img := trayicon.Draw("40", false, 20)
 func Draw(label string, muted bool, size int) *image.NRGBA {
 	tile, ink := indigo, white
 	if muted {
@@ -63,7 +64,8 @@ func Draw(label string, muted bool, size int) *image.NRGBA {
 	return img
 }
 
-func encodePNG(img image.Image) []byte {
+// EncodePNG encodes an icon from Draw as PNG, the format a tray icon is set from.
+func EncodePNG(img image.Image) []byte {
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
 		panic(err) // png.Encode fails only on write errors, and a bytes.Buffer does not fail

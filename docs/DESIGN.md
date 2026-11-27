@@ -295,6 +295,7 @@ internal/osd/         OSD ウィンドウ (Win32 と GDI)
 internal/settings/    設定画面 (MyGo のネイティブ UI)
 internal/taskbar/     UI Automation でタスクバーのボタンからアプリを特定
 internal/tray/        トレイアイコンとメニュー
+internal/trayicon/    トレイアイコンの数字の描画 (Windows に依存しないので tools/genicons からも使う)
 internal/update/      GitHub Releases の確認、ダウンロード、インストーラーの起動
 internal/win32/       直接呼ぶ Win32 API の宣言
 tools/genicons/       アイコンとロゴの生成

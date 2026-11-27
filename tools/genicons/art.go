@@ -11,7 +11,7 @@ import "math"
 //   - a round knob inside it, with a pointer at the end of the filled length
 //   - in the opening of the arc, a small speaker that says the knob is for sound
 //
-// The scale is filled all the way. The tray icon is not drawn here: internal/tray draws the volume as a number on the same indigo tile.
+// The scale is filled all the way. The tray icon is not drawn here: internal/trayicon draws the volume as a number on the same indigo tile.
 //
 // The wordmark draws "Volm" with strokes of one width and round ends, and its "o" is the knob: the scale, open at the bottom and amber as in the icon, around an indigo dot.
 
