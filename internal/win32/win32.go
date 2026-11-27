@@ -18,6 +18,7 @@ var (
 	shcore   = windows.NewLazySystemDLL("shcore.dll")
 	dwmapi   = windows.NewLazySystemDLL("dwmapi.dll")
 	kernel32 = windows.NewLazySystemDLL("kernel32.dll")
+	shell32  = windows.NewLazySystemDLL("shell32.dll")
 
 	ProcSetWindowsHookExW          = user32.NewProc("SetWindowsHookExW")
 	ProcUnhookWindowsHookEx        = user32.NewProc("UnhookWindowsHookEx")
@@ -78,6 +79,8 @@ var (
 	ProcDwmSetWindowAttribute = dwmapi.NewProc("DwmSetWindowAttribute")
 
 	ProcGetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
+
+	ProcSHQueryUserNotificationState = shell32.NewProc("SHQueryUserNotificationState")
 )
 
 // Constants of the Windows SDK, under their SDK names.
@@ -140,6 +143,10 @@ const (
 	DWMWCP_ROUND                   = 2
 
 	SM_CXSMICON = 49
+
+	QUNS_BUSY                    = 2
+	QUNS_RUNNING_D3D_FULL_SCREEN = 3
+	QUNS_PRESENTATION_MODE       = 4
 )
 
 // Point is POINT.
@@ -392,4 +399,17 @@ func TrayIconSize() int {
 		return 16
 	}
 	return int(size)
+}
+
+// FullscreenAppInFront reports whether Windows sees a full-screen app, such as a game, a video or a slide show, in front: the state in which it holds back its own notifications. A maximized window is not full screen, even with the taskbar set to hide itself.
+func FullscreenAppInFront() bool {
+	var state uint32
+	if hr, _, _ := ProcSHQueryUserNotificationState.Call(uintptr(unsafe.Pointer(&state))); hr != 0 {
+		return false
+	}
+	switch state {
+	case QUNS_BUSY, QUNS_RUNNING_D3D_FULL_SCREEN, QUNS_PRESENTATION_MODE:
+		return true
+	}
+	return false
 }

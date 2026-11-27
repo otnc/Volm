@@ -41,6 +41,8 @@ type Config struct {
 	// Hotkeys maps an action to up to two key combinations. Load merges the file over the defaults, so an action without keys must be stored as an empty list: a missing action gets its default keys back.
 	Hotkeys map[string][]string `json:"hotkeys"`
 	Update  Update              `json:"update"`
+	// PauseInFullscreen leaves the wheel over the taskbar to other apps and hides the OSD while a full-screen app is in front. Hotkeys still work.
+	PauseInFullscreen bool `json:"pauseInFullscreen"`
 }
 
 // Volume holds the settings of the wheel and middle click on the taskbar.

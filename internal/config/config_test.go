@@ -45,6 +45,25 @@ func TestSaveThenLoadKeepsChanges(t *testing.T) {
 	}
 }
 
+// TestOptInFeaturesStartOff pins the features the author chose to leave off on a fresh install.
+func TestOptInFeaturesStartOff(t *testing.T) {
+	if Default().PauseInFullscreen {
+		t.Error("pausing in full screen is on by default")
+	}
+}
+
+func TestLoadReadsPauseInFullscreen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	writeFile(t, path, `{"pauseInFullscreen":true}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.PauseInFullscreen {
+		t.Fatal("pauseInFullscreen in the file was not read")
+	}
+}
+
 func TestLoadKeepsDefaultsForMissingFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	writeFile(t, path, `{"version":1,"volume":{"step":4}}`)
