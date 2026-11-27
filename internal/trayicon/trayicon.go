@@ -81,35 +81,40 @@ func Draw(percent int, hasDevice, muted bool, size int) *image.NRGBA {
 		}
 		x += m.advance(r)
 	}
+	// The outline, in the tile's color, keeps the number readable where it crosses the scale.
+	blend(img, dilate(mask, outlineWidth(size)), tile)
 	blend(img, mask, ink)
 	return img
 }
 
-// numberLayout sizes the number to fit inside the scale and above the speaker, and returns its top-left corner, centered across the icon. Every label gets the size that lets "100", the widest, clear the ring, so that the digits keep one size as the volume changes.
+// outlineWidth is how far the tile-colored outline reaches around the number: 1 px up to 31 px, then 1 px more for every 16.
+func outlineWidth(size int) int { return max(1, size/16) }
+
+// dilate returns mask grown by n pixels in every direction, corners included.
+func dilate(mask *image.Alpha, n int) *image.Alpha {
+	b := mask.Bounds()
+	out := image.NewAlpha(b)
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if mask.AlphaAt(x, y).A == 0 {
+				continue
+			}
+			draw.Draw(out, image.Rect(x-n, y-n, x+n+1, y+n+1).Intersect(b), image.Opaque, image.Point{}, draw.Src)
+		}
+	}
+	return out
+}
+
+// numberLayout sizes the number and returns its top-left corner, centered across the icon. The number with its outline may cross the sides of the scale, but stays below its top, a pixel inside the tile's edge and above the speaker. Every label gets the size "100", the widest, needs, so that the digits keep one size as the volume changes.
 func numberLayout(label string, size int) (metrics, image.Point) {
 	scale := scaleFor(float64(size))
-	top, bottom := scale.cy-scale.inner(), speakerFor(scale).top()-1
-	// The number sits at the ring's center when the speaker leaves room for it, and as low as the speaker allows otherwise.
-	place := func(m metrics, label string) image.Point {
-		h := float64(m.height)
-		return image.Pt((size-m.width(label))/2, int(math.Round(min(scale.cy-h/2, bottom-h))))
-	}
-	// Half a pixel clear of the ring's inner edge, where its smoothed edge starts.
-	ringEdge := scale.radius - scale.width/2 - 0.5
-	m := metricsFor(scale.roomWidth(), int(bottom-top))
-	for h := int(bottom - top); h > 5; h-- {
-		m = metricsFor(scale.roomWidth(), h)
-		at := place(m, "100")
-		box := image.Rect(at.X, at.Y, at.X+m.width("100"), at.Y+m.height)
-		fits := true
-		for _, c := range []image.Point{box.Min, {box.Max.X, box.Min.Y}, {box.Min.X, box.Max.Y}, box.Max} {
-			fits = fits && math.Hypot(float64(c.X)-scale.cx, float64(c.Y)-scale.cy) <= ringEdge
-		}
-		if fits {
-			break
-		}
-	}
-	return m, place(m, label)
+	o := outlineWidth(size)
+	// The top of the number stays below the inner edge of the scale, so that the scale's top, where most volumes end, is never covered.
+	top := int(math.Ceil(scale.cy - scale.radius + scale.width/2))
+	speakerTop := int(speakerFor(scale).top())
+	m := metricsFor(size-2*(o+1), speakerTop-1-o-top)
+	// The number is sized with a pixel to spare above the speaker, then set down onto it, so that its outline meets the speaker without covering it and more of the scale's top shows.
+	return m, image.Pt((size-m.width(label))/2, speakerTop-o-m.height)
 }
 
 // The scale runs clockwise through 270°, from 135° left of 12 o'clock to 135° right of it, as in the app icon.
@@ -128,16 +133,6 @@ func scaleFor(size float64) scaleRing {
 	// The margin to the tile's edge shrinks faster than the icon, so that "100" still fits inside the ring at 16 px.
 	margin := max(0, size*0.05-0.5)
 	return scaleRing{cx: size / 2, cy: size / 2, radius: size/2 - margin - width/2, width: width}
-}
-
-// inner is the radius of the free space inside the ring, a margin away from it.
-func (r scaleRing) inner() float64 {
-	return r.radius - r.width/2 - max(1, r.width*0.5)
-}
-
-// roomWidth is how wide the number may be: narrower than the ring's inside, so that the corners of "100" stay off the ring.
-func (r scaleRing) roomWidth() int {
-	return int(2 * r.inner() * 0.88)
 }
 
 // speaker is the small speaker in the opening at the bottom of the scale, as in the app icon: a box, a cone and one sound wave, drawn in units of the app icon's 48-unit grid around its center.
@@ -240,7 +235,7 @@ type metrics struct {
 }
 
 func metricsFor(w, h int) metrics {
-	m := metrics{stroke: max(1, (h+2)/7), gap: 1}
+	m := metrics{stroke: max(1, (h+3)/6), gap: 1}
 	m.digit = max(2*m.stroke+1, (w-m.stroke-2*m.gap)/2)
 	m.counter = max(1, (h-3*m.stroke)/2)
 	m.height = 3*m.stroke + 2*m.counter
