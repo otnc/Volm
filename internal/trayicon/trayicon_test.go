@@ -33,22 +33,61 @@ func TestLabel(t *testing.T) {
 	}
 }
 
-// TestEveryLabelFits checks that every volume, "100" included, fits inside the icon with whole counters, so that no digit is cut off or fills in at small sizes.
+// TestEveryLabelFits checks that every volume, "100" included, is drawn with whole counters and that none of its pixels touches the scale or the speaker, at every size.
 func TestEveryLabelFits(t *testing.T) {
 	for _, size := range iconSizes {
-		m := metricsFor(size)
-		if m.height > size {
-			t.Errorf("size %d: glyphs are %d px tall", size, m.height)
-		}
-		if m.digit-2*m.stroke < 1 {
-			t.Errorf("size %d: a %d px digit with %d px strokes has no counter", size, m.digit, m.stroke)
-		}
+		scale := scaleFor(float64(size))
+		sp := speakerFor(scale)
+		others := []func(x, y float64) bool{scale.arc(scaleStart, scaleStart+scaleSweep), sp.body(), sp.wave(), sp.slash()}
 		for percent := range 101 {
-			if w := m.width(strconv.Itoa(percent)); w > size {
-				t.Errorf("size %d: %d is %d px wide", size, percent, w)
+			label := strconv.Itoa(percent)
+			m, _ := numberLayout(label, size)
+			if m.digit-2*m.stroke < 1 || m.counter < 1 {
+				t.Fatalf("size %d: a %d × %d px digit with %d px strokes has no counter", size, m.digit, m.height, m.stroke)
+			}
+			for _, p := range numberPixels(label, size) {
+				for _, other := range others {
+					if covers(other, p) {
+						t.Errorf("size %d: pixel %v of %s touches the scale or the speaker", size, p, label)
+					}
+				}
 			}
 		}
 	}
+}
+
+// numberPixels lists the pixels Draw inks for label.
+func numberPixels(label string, size int) []image.Point {
+	m, at := numberLayout(label, size)
+	var pixels []image.Point
+	x := at.X
+	for i, r := range label {
+		if i > 0 {
+			x += m.gap
+		}
+		for _, seg := range m.glyph(r) {
+			seg = seg.Add(image.Pt(x, at.Y))
+			for py := seg.Min.Y; py < seg.Max.Y; py++ {
+				for px := seg.Min.X; px < seg.Max.X; px++ {
+					pixels = append(pixels, image.Pt(px, py))
+				}
+			}
+		}
+		x += m.advance(r)
+	}
+	return pixels
+}
+
+// covers reports whether the shape reaches into pixel p at any of the samples paint uses.
+func covers(shape func(x, y float64) bool, p image.Point) bool {
+	for sy := range 4 {
+		for sx := range 4 {
+			if shape(float64(p.X)+(float64(sx)+0.5)/4, float64(p.Y)+(float64(sy)+0.5)/4) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // TestDigitsDiffer guards against two characters sharing a shape, which would make the icon show a wrong number.
@@ -68,7 +107,7 @@ func TestDigitsDiffer(t *testing.T) {
 
 func TestDrawSize(t *testing.T) {
 	for _, size := range iconSizes {
-		img, err := png.Decode(bytes.NewReader(EncodePNG(Draw("100", false, size))))
+		img, err := png.Decode(bytes.NewReader(EncodePNG(Draw(100, true, false, size))))
 		if err != nil {
 			t.Fatalf("size %d: %v", size, err)
 		}
@@ -80,10 +119,9 @@ func TestDrawSize(t *testing.T) {
 
 // TestDrawInk checks the colors at the middle segment of "8": white on indigo normally, half-transparent white over the grey tile while muted.
 func TestDrawInk(t *testing.T) {
-	const size = 20
-	m := metricsFor(size)
-	corner := image.Pt((size-m.digit)/2, (size-m.height)/2)
-	middle := image.Pt(size/2, corner.Y+m.stroke+m.counter)
+	const size = 32
+	m, corner := numberLayout("8", size)
+	middle := image.Pt(corner.X+m.digit/2, corner.Y+m.stroke+m.counter)
 	tests := []struct {
 		name  string
 		muted bool
@@ -95,7 +133,7 @@ func TestDrawInk(t *testing.T) {
 		{"muted", true, [4]uint8{0xB5, 0xB9, 0xC0, 0xFF}, [4]uint8{0x6B, 0x72, 0x80, 0xFF}},
 	}
 	for _, tt := range tests {
-		img := Draw("8", tt.muted, size)
+		img := Draw(8, true, tt.muted, size)
 		if got := rgba(img, middle); got != tt.ink {
 			t.Errorf("%s: ink %x, want %x", tt.name, got, tt.ink)
 		}
@@ -113,16 +151,73 @@ func TestDrawInk(t *testing.T) {
 // TestDrawSeparatesDigits checks that a column of tile is left between two digits, so that "88" does not read as one shape.
 func TestDrawSeparatesDigits(t *testing.T) {
 	for _, size := range iconSizes {
-		m := metricsFor(size)
-		img := Draw("88", false, size)
-		left := (size - m.width("88")) / 2
-		y := (size - m.height) / 2 // the top segment, which spans each digit's full width
+		m, at := numberLayout("88", size)
+		img := Draw(88, true, false, size)
+		y := at.Y // the top segment, which spans each digit's full width
 		// The column right after the first digit must be tile even if the gap shrank to nothing.
-		x := left + m.digit
+		x := at.X + m.digit
 		if got := rgba(img, image.Pt(x, y)); got != [4]uint8{0x3F, 0x3C, 0xBB, 0xFF} {
 			t.Errorf("size %d: pixel (%d, %d) after the first digit is %x", size, x, y, got)
 		}
 	}
+}
+
+// TestScaleFollowsVolume checks the amber fill of the scale against the middle of its left and right sides, which lie at 25% and 75% of its sweep.
+func TestScaleFollowsVolume(t *testing.T) {
+	const size = 32
+	scale := scaleFor(size)
+	left := image.Pt(int(scale.cx-scale.radius), int(scale.cy))
+	right := image.Pt(int(scale.cx+scale.radius), int(scale.cy))
+	tests := []struct {
+		name                  string
+		percent               int
+		hasDevice, muted      bool
+		leftAmber, rightAmber bool
+	}{
+		{"empty at 0%", 0, true, false, false, false},
+		{"left side at 50%", 50, true, false, true, false},
+		{"both sides at 100%", 100, true, false, true, true},
+		{"empty while muted", 100, true, true, false, false},
+		{"empty without a device", 100, false, false, false, false},
+	}
+	for _, tt := range tests {
+		img := Draw(tt.percent, tt.hasDevice, tt.muted, size)
+		if got := rgba(img, left) == rgba(fullAmber(), image.Point{}); got != tt.leftAmber {
+			t.Errorf("%s: left side amber = %v, want %v (%x)", tt.name, got, tt.leftAmber, rgba(img, left))
+		}
+		if got := rgba(img, right) == rgba(fullAmber(), image.Point{}); got != tt.rightAmber {
+			t.Errorf("%s: right side amber = %v, want %v (%x)", tt.name, got, tt.rightAmber, rgba(img, right))
+		}
+	}
+}
+
+// TestSlashOnlyWhileMuted checks that the red slash crosses the speaker while muted and never shows otherwise.
+func TestSlashOnlyWhileMuted(t *testing.T) {
+	for _, size := range iconSizes {
+		if hasRed(Draw(50, true, false, size)) {
+			t.Errorf("size %d: red without mute", size)
+		}
+		if !hasRed(Draw(50, true, true, size)) {
+			t.Errorf("size %d: no red slash while muted", size)
+		}
+	}
+}
+
+func hasRed(img *image.NRGBA) bool {
+	for y := range img.Bounds().Dy() {
+		for x := range img.Bounds().Dx() {
+			if c := img.NRGBAAt(x, y); c.R > 0xC0 && c.G < 0x80 && c.B < 0x80 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func fullAmber() *image.NRGBA {
+	img := image.NewNRGBA(image.Rect(0, 0, 1, 1))
+	img.SetNRGBA(0, 0, amber)
+	return img
 }
 
 func rgba(img *image.NRGBA, p image.Point) [4]uint8 {
