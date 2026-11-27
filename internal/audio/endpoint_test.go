@@ -4,18 +4,20 @@
 package audio
 
 import (
+	"errors"
 	"os"
+	"slices"
 	"testing"
 	"time"
 )
 
-// These tests change the real system volume for a moment and restore it. They run only with VOLM_INTEGRATION=1 on a machine with a playback device.
-func openForTest(t *testing.T) *Endpoint {
+// These tests change the real system volume for a moment and restore it. They run only with VOLM_INTEGRATION=1 on a machine with a playback device, and the recording tests also need a microphone.
+func openForTest(t *testing.T, flow Flow) *Endpoint {
 	t.Helper()
 	if os.Getenv("VOLM_INTEGRATION") != "1" {
 		t.Skip("set VOLM_INTEGRATION=1 to change the real system volume")
 	}
-	ep, err := Open()
+	ep, err := Open(flow)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +27,7 @@ func openForTest(t *testing.T) *Endpoint {
 }
 
 func TestStepChangesVolumeAndNotifies(t *testing.T) {
-	ep := openForTest(t)
+	ep := openForTest(t, Playback)
 	before, err := ep.Current()
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +53,7 @@ func TestStepChangesVolumeAndNotifies(t *testing.T) {
 }
 
 func TestToggleMuteFlipsAndNotifies(t *testing.T) {
-	ep := openForTest(t)
+	ep := openForTest(t, Playback)
 	before, err := ep.Current()
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +73,7 @@ func TestToggleMuteFlipsAndNotifies(t *testing.T) {
 }
 
 func TestStepUpUnmutesOnlyWhenAsked(t *testing.T) {
-	ep := openForTest(t)
+	ep := openForTest(t, Playback)
 	before, err := ep.Current()
 	if err != nil {
 		t.Fatal(err)
@@ -147,7 +149,7 @@ func waitForChange(t *testing.T, ep *Endpoint, match func(State) bool) {
 }
 
 func TestNextDeviceCyclesAndRestores(t *testing.T) {
-	ep := openForTest(t)
+	ep := openForTest(t, Playback)
 	devices, err := ep.Devices()
 	if err != nil {
 		t.Fatal(err)
@@ -178,4 +180,47 @@ func TestNextDeviceCyclesAndRestores(t *testing.T) {
 		t.Fatalf("NextDevice stayed on %s", original.Name)
 	}
 	waitForChange(t, ep, func(st State) bool { return st.Device == next.Name })
+}
+
+// TestRecordingFollowsTheMicrophone checks that a recording endpoint reads and changes the default microphone, not the speakers.
+func TestRecordingFollowsTheMicrophone(t *testing.T) {
+	mic := openForTest(t, Recording)
+	speakers := openForTest(t, Playback)
+	before, err := mic.Current()
+	if errors.Is(err, ErrNoDevice) {
+		t.Skip("no microphone")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	speakersBefore, err := speakers.Current()
+	if err != nil {
+		t.Fatal(err)
+	}
+	notches := 1
+	if before.Percent >= 98 {
+		notches = -1
+	}
+	t.Cleanup(func() {
+		if _, err := mic.Step(-notches, 2, false); err != nil {
+			t.Errorf("restoring microphone volume: %v", err)
+		}
+	})
+	after, err := mic.Step(notches, 2, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := before.Percent + notches*2; after.Percent != want {
+		t.Fatalf("microphone percent = %d, want %d", after.Percent, want)
+	}
+	if st, err := speakers.Current(); err != nil || st.Percent != speakersBefore.Percent {
+		t.Fatalf("speakers changed to %d (%v) from %d", st.Percent, err, speakersBefore.Percent)
+	}
+	devices, err := mic.Devices()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(devices, func(d Device) bool { return d.Default && d.Name == before.Device }) {
+		t.Fatalf("devices %+v do not mark %q as the default", devices, before.Device)
+	}
 }

@@ -14,16 +14,19 @@ import (
 	"github.com/otnc/Volm/internal/win32"
 )
 
-// Actions are the menu commands. They run on MyGo's main thread and must hand slow work to another goroutine, apart from Devices, which the menu needs before it opens.
+// Actions are the menu commands. They run on MyGo's main thread and must hand slow work to another goroutine, apart from Devices and InputDevices, which the menu needs before it opens.
 type Actions struct {
-	ToggleMute   func()
-	Devices      func() []Device
-	SelectDevice func(id string)
-	OpenSettings func()
-	Quit         func()
+	ToggleMute        func()
+	ToggleMicMute     func()
+	Devices           func() []Device
+	SelectDevice      func(id string)
+	InputDevices      func() []Device
+	SelectInputDevice func(id string)
+	OpenSettings      func()
+	Quit              func()
 }
 
-// Device is a playback device in the menu.
+// Device is a playback or recording device in the menu.
 type Device struct {
 	ID, Name string
 	Default  bool
@@ -33,9 +36,11 @@ type Device struct {
 type Tray struct {
 	icon    *mygo.Tray
 	actions Actions
-	// shown is what the icon shows now, and muted whether the device is muted; both are touched only on the main thread.
-	shown iconKey
-	muted bool
+	// shown is what the icon shows now, muted whether the playback device is muted, and micMuted and hasMic the same for the microphone; all are touched only on the main thread.
+	shown    iconKey
+	muted    bool
+	micMuted bool
+	hasMic   bool
 }
 
 type iconKey struct {
@@ -51,7 +56,7 @@ func New(actions Actions) (*Tray, error) {
 		ID:      "volm",
 		Icon:    trayicon.EncodePNG(trayicon.Draw(t.shown.label, t.shown.muted, t.shown.size)),
 		ToolTip: "Volm",
-		Menu:    t.menu(nil),
+		Menu:    t.menu(nil, nil),
 	})
 	if err != nil {
 		return nil, err
@@ -59,33 +64,45 @@ func New(actions Actions) (*Tray, error) {
 	t.icon = icon
 	icon.OnClick(actions.OpenSettings)
 	// On Windows the right click arrives before the menu opens, on the main thread, so the menu shows the devices as they are now.
-	icon.OnRightClick(func() { icon.SetMenu(t.menu(actions.Devices())) })
+	icon.OnRightClick(func() { icon.SetMenu(t.menu(actions.Devices(), actions.InputDevices())) })
 	return t, nil
 }
 
-func (t *Tray) menu(devices []Device) *mygo.Menu {
-	// MyGo toggles a checkbox item before calling Click; Update sets it again from the device, so a failed toggle does not leave the check wrong.
+func (t *Tray) menu(outputs, inputs []Device) *mygo.Menu {
+	// MyGo toggles a checkbox item before calling Click; Update and UpdateMic set it again from the device, so a failed toggle does not leave the check wrong.
 	mute := &mygo.MenuItem{Label: "ミュート", Type: mygo.MenuItemCheckbox, Checked: t.muted, Click: func(*mygo.MenuItem, *mygo.Window) { t.actions.ToggleMute() }}
-	output := &mygo.MenuItem{Label: "出力デバイス"}
-	for _, d := range devices {
-		id := d.ID
-		output.Submenu = append(output.Submenu, &mygo.MenuItem{
-			Label:   d.Name,
-			Type:    mygo.MenuItemRadio,
-			Checked: d.Default,
-			Click:   func(*mygo.MenuItem, *mygo.Window) { t.actions.SelectDevice(id) },
-		})
-	}
-	if len(output.Submenu) == 0 {
-		output.Submenu = []*mygo.MenuItem{{Label: "再生デバイスがありません", Disabled: true}}
-	}
+	micMute := &mygo.MenuItem{Label: "マイクをミュート", Type: mygo.MenuItemCheckbox, Checked: t.micMuted, Disabled: !t.hasMic, Click: func(*mygo.MenuItem, *mygo.Window) { t.actions.ToggleMicMute() }}
 	return mygo.NewMenu([]*mygo.MenuItem{
 		mute,
-		output,
+		micMute,
+		deviceMenu("出力デバイス", "再生デバイスがありません", outputs, t.actions.SelectDevice),
+		deviceMenu("入力デバイス", "録音デバイスがありません", inputs, t.actions.SelectInputDevice),
 		mygo.Separator(),
 		{Label: "設定", Click: func(*mygo.MenuItem, *mygo.Window) { t.actions.OpenSettings() }},
 		{Label: "終了", Click: func(*mygo.MenuItem, *mygo.Window) { t.actions.Quit() }},
 	})
+}
+
+func deviceMenu(label, none string, devices []Device, selectDevice func(id string)) *mygo.MenuItem {
+	item := &mygo.MenuItem{Label: label}
+	for _, d := range devices {
+		id := d.ID
+		item.Submenu = append(item.Submenu, &mygo.MenuItem{
+			Label:   d.Name,
+			Type:    mygo.MenuItemRadio,
+			Checked: d.Default,
+			Click:   func(*mygo.MenuItem, *mygo.Window) { selectDevice(id) },
+		})
+	}
+	if len(item.Submenu) == 0 {
+		item.Submenu = []*mygo.MenuItem{{Label: none, Disabled: true}}
+	}
+	return item
+}
+
+// UpdateMic records the mute of the default microphone for the menu. hasMic is false when there is no recording device.
+func (t *Tray) UpdateMic(muted, hasMic bool) {
+	mygo.RunOnMain(func() { t.micMuted, t.hasMic = muted, hasMic })
 }
 
 // Update shows the volume of the default device. device is empty when there is no playback device.

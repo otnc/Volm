@@ -22,6 +22,9 @@ const (
 	NextTrack      Action = "nextTrack"
 	PreviousTrack  Action = "previousTrack"
 	NextDevice     Action = "nextOutputDevice"
+	MicVolumeUp    Action = "micVolumeUp"
+	MicVolumeDown  Action = "micVolumeDown"
+	ToggleMicMute  Action = "toggleMicMute"
 )
 
 // Actions lists every action with its name in the settings window.
@@ -38,6 +41,9 @@ var Actions = []struct {
 	{NextTrack, "次の曲"},
 	{PreviousTrack, "前の曲"},
 	{NextDevice, "出力デバイスを順に切り替える"},
+	{MicVolumeUp, "マイクの音量を上げる"},
+	{MicVolumeDown, "マイクの音量を下げる"},
+	{ToggleMicMute, "マイクのミュートを切り替える"},
 }
 
 // MaxKeysPerAction is how many combinations one action can have.

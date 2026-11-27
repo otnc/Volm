@@ -22,7 +22,17 @@ const (
 	IconSpeakerMid  Icon = 0xE994
 	IconSpeakerHigh Icon = 0xE995
 	IconBrightness  Icon = 0xE706
+	IconMicrophone  Icon = 0xE720
+	IconMicOff      Icon = 0xEC54
 )
+
+// MicrophoneIcon returns the microphone glyph, crossed out while muted.
+func MicrophoneIcon(muted bool) Icon {
+	if muted {
+		return IconMicOff
+	}
+	return IconMicrophone
+}
 
 // SpeakerIcon returns the speaker glyph for a volume.
 func SpeakerIcon(percent int, muted bool) Icon {
