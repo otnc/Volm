@@ -27,7 +27,9 @@
 
 ## インストール
 
-まだリリースはありません。リリースを公開したら、[Releases](https://github.com/otnc/Volm/releases) から `Volm-Setup-<バージョン>.exe` をダウンロードして実行します。管理者権限は要らず、`%LOCALAPPDATA%\Programs\Volm` に入ります。それまでは、ソースからビルドして使います。手順は [CONTRIBUTING.md](CONTRIBUTING.md) の「ビルドと実行」を見てください。
+[Releases](https://github.com/otnc/Volm/releases) から `Volm-Setup-<バージョン>.exe` をダウンロードして実行します。管理者権限は要らず、`%LOCALAPPDATA%\Programs\Volm` に入ります。インストーラーにはコード署名がないため、初めて実行するときに Windows SmartScreen の警告が出ることがあります。そのときは「詳細情報」から「実行」を選んでください。
+
+インストーラーを使わない場合は、`Volm-<バージョン>-windows-amd64.zip` を好きなフォルダーに展開して `Volm.exe` を実行します。ソースからビルドする手順は [CONTRIBUTING.md](CONTRIBUTING.md) の「ビルドと実行」にあります。
 
 新しいバージョンは、設定画面の「更新」のページから確かめて入れられます。起動時にも 1 日に 1 回まで確かめ、新しいバージョンがあれば通知します。
 
