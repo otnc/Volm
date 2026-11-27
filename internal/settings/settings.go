@@ -330,6 +330,14 @@ func (w *window) volumePage(c *ui.Context) {
 		ui.Text(c, fmt.Sprintf("%d%%", int(w.volumeStep))).Width(44).TextAlign(ui.End)
 		w.resetButton(c, "ホイール 1 段で変わる音量", w.cfg.Volume.Step == def.Volume.Step, func() { w.cfg.Volume.Step = def.Volume.Step })
 	})
+	row(c, w.icons.speed, "速く回すと大きく変える", "ホイールを速く回したときは、1 段で変わる音量を最大 4 倍にします。Shift を押しながら回すと、この設定にかかわらず 1% ずつ変わります。", func() {
+		if ui.Switch(c, &w.cfg.Volume.Acceleration).Label("速く回すと大きく変える").Changed() {
+			w.save()
+		}
+		w.resetButton(c, "速く回すと大きく変える", w.cfg.Volume.Acceleration == def.Volume.Acceleration, func() {
+			w.cfg.Volume.Acceleration = def.Volume.Acceleration
+		})
+	})
 	row(c, w.icons.volumeOff, "中クリックでミュートを切り替える", "タスクバーの上でホイールを押し込むと、ミュートをオンまたはオフにします。", func() {
 		if ui.Switch(c, &w.cfg.Volume.MiddleClickMute).Label("中クリックでミュートを切り替える").Changed() {
 			w.save()
@@ -451,7 +459,7 @@ var iconFiles embed.FS
 
 type icons struct {
 	tune, volumeUp, volumeOff, osd, info, restart, mouse,
-	timer, position, visibility, code, gavel, person, login, restartApp, quit, apps, titleBar, update, science, fullscreen,
+	timer, position, visibility, code, gavel, person, login, restartApp, quit, apps, titleBar, update, science, fullscreen, speed,
 	brightness, brightnessLow, monitor,
 	keyboard, add, close, uninstall *ui.SVG
 }
@@ -487,6 +495,7 @@ func loadIcons() icons {
 		update:        svg("update"),
 		science:       svg("science"),
 		fullscreen:    svg("fullscreen"),
+		speed:         svg("speed"),
 		add:           svg("add"),
 		close:         svg("close"),
 		uninstall:     svg("delete"),

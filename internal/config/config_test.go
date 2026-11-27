@@ -50,6 +50,9 @@ func TestOptInFeaturesStartOff(t *testing.T) {
 	if Default().PauseInFullscreen {
 		t.Error("pausing in full screen is on by default")
 	}
+	if Default().Volume.Acceleration {
+		t.Error("wheel acceleration is on by default")
+	}
 }
 
 func TestLoadReadsPauseInFullscreen(t *testing.T) {
