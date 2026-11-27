@@ -61,7 +61,7 @@ VOLM_INTEGRATION=1 go test ./internal/audio/
 
 | ファイル | 生成するコマンド | 生成し直すとき |
 |---|---|---|
-| `assets/icon.svg`、`assets/icon.png`、`assets/volm.ico`、`assets/logo.svg`、`internal/tray/icons/*.png`、`internal/settings/*.png` | `go run ./tools/genicons` | アイコンやロゴの絵を変えたとき。図形は `tools/genicons/art.go` で定義している |
+| `assets/icon.svg`、`assets/icon.png`、`assets/volm.ico`、`assets/logo.svg`、`internal/settings/*.png` | `go run ./tools/genicons` | アイコンやロゴの絵を変えたとき。図形は `tools/genicons/art.go` で定義している |
 | `THIRD_PARTY_NOTICES.md` | `go run ./tools/gennotices` | 依存するモジュールを足したり、更新したりしたとき |
 
 設定画面のアイコン (`internal/settings/icons/*.svg`) は、[Material Symbols](https://github.com/google/material-design-icons) の Rounded スタイルの 24px の SVG をそのまま置いています。足すときは同じスタイルのものを選んでください。

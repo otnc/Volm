@@ -1,7 +1,7 @@
 // Copyright (C) 2026 otoneko.
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Package tray shows Volm's notification area icon, whose picture and tooltip follow the volume, and its menu.
+// Package tray shows Volm's notification area icon, which shows the volume as a number and its device in the tooltip, and its menu.
 package tray
 
 import (
@@ -9,6 +9,9 @@ import (
 	"log"
 
 	"github.com/egoist/mygo"
+
+	"github.com/otnc/Volm/internal/trayicon"
+	"github.com/otnc/Volm/internal/win32"
 )
 
 // Actions are the menu commands. They run on MyGo's main thread and must hand slow work to another goroutine, apart from Devices, which the menu needs before it opens.
@@ -30,17 +33,23 @@ type Device struct {
 type Tray struct {
 	icon    *mygo.Tray
 	actions Actions
-	level   Level
-	muted   bool // touched only on the main thread
+	// shown is what the icon shows now, and muted whether the device is muted; both are touched only on the main thread.
+	shown iconKey
+	muted bool
+}
+
+type iconKey struct {
+	label string
+	muted bool
+	size  int
 }
 
 // New adds the icon. Call it once MyGo is ready (in mygo.App.WhenReady).
 func New(actions Actions) (*Tray, error) {
-	// No level matches -1, so the first Update always sets the icon.
-	t := &Tray{actions: actions, level: -1}
+	t := &Tray{actions: actions, shown: iconKey{label: trayicon.Label(0, false), size: win32.TrayIconSize()}}
 	icon, err := mygo.NewTray(mygo.TrayOptions{
 		ID:      "volm",
-		Icon:    levelIcon(LevelMid),
+		Icon:    trayicon.EncodePNG(trayicon.Draw(t.shown.label, t.shown.muted, t.shown.size)),
 		ToolTip: "Volm",
 		Menu:    t.menu(nil),
 	})
@@ -82,10 +91,13 @@ func (t *Tray) menu(devices []Device) *mygo.Menu {
 // Update shows the volume of the default device. device is empty when there is no playback device.
 func (t *Tray) Update(percent int, muted bool, device string) {
 	mygo.RunOnMain(func() {
-		if level := LevelOf(percent, muted); level != t.level {
-			t.level = level
-			if err := t.icon.SetIcon(levelIcon(level), false); err != nil {
+		// The size is looked up again on every change, so that a new display scale takes effect with the next change of the volume.
+		key := iconKey{label: trayicon.Label(percent, device != ""), muted: muted, size: win32.TrayIconSize()}
+		if key != t.shown {
+			if err := t.icon.SetIcon(trayicon.EncodePNG(trayicon.Draw(key.label, key.muted, key.size)), false); err != nil {
 				log.Printf("tray: setting icon: %v", err)
+			} else {
+				t.shown = key
 			}
 		}
 		t.icon.SetToolTip(Tooltip(percent, muted, device))

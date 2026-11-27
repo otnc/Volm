@@ -59,6 +59,7 @@ var (
 	ProcGetWindowThreadProcessID   = user32.NewProc("GetWindowThreadProcessId")
 	ProcSetForegroundWindow        = user32.NewProc("SetForegroundWindow")
 	ProcIsIconic                   = user32.NewProc("IsIconic")
+	ProcGetSystemMetricsForDpi     = user32.NewProc("GetSystemMetricsForDpi")
 
 	ProcCreateCompatibleDC     = gdi32.NewProc("CreateCompatibleDC")
 	ProcCreateCompatibleBitmap = gdi32.NewProc("CreateCompatibleBitmap")
@@ -137,6 +138,8 @@ const (
 
 	DWMWA_WINDOW_CORNER_PREFERENCE = 33
 	DWMWCP_ROUND                   = 2
+
+	SM_CXSMICON = 49
 )
 
 // Point is POINT.
@@ -372,4 +375,21 @@ func BringToFront(title string) bool {
 	}
 	ProcSetForegroundWindow.Call(hwnd)
 	return true
+}
+
+// TrayIconSize returns the width in pixels of a notification area icon on the main taskbar, which follows the DPI of that taskbar's monitor.
+func TrayIconSize() int {
+	dpi := uintptr(96)
+	if name, err := windows.UTF16PtrFromString("Shell_TrayWnd"); err == nil {
+		if taskbar, _, _ := ProcFindWindowW.Call(uintptr(unsafe.Pointer(name)), 0); taskbar != 0 {
+			if d, _, _ := ProcGetDpiForWindow.Call(taskbar); d != 0 {
+				dpi = d
+			}
+		}
+	}
+	size, _, _ := ProcGetSystemMetricsForDpi.Call(SM_CXSMICON, dpi)
+	if size == 0 {
+		return 16
+	}
+	return int(size)
 }

@@ -7,18 +7,20 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+
+	"github.com/otnc/Volm/internal/trayicon"
 )
 
-// previewSheet lays out what to check after changing the artwork: the logo on a light and a dark background, the icon large, and the tray icons at their real size and enlarged without smoothing, on both kinds of taskbar.
+// previewSheet lays out what to check after changing the artwork: the logo on a light and a dark background, the icon large, and tray icons for a few volumes at 16 and 24 px (100% and 150% scale), at their real size and enlarged without smoothing, on both kinds of taskbar.
 func previewSheet() *image.NRGBA {
 	const (
 		width   = 1200
 		pad     = 40
 		logoH   = 160
 		iconPx  = 320
-		trayPx  = 32
+		trayPx  = 24
 		zoom    = 4
-		trayGap = 24
+		trayGap = 20
 	)
 	light := color.NRGBA{0xF3, 0xF3, 0xF3, 0xFF}
 	dark := color.NRGBA{0x1C, 0x1C, 0x1F, 0xFF}
@@ -36,18 +38,25 @@ func previewSheet() *image.NRGBA {
 	}
 
 	fill(sheet, image.Rect(0, y, width, y+iconPx+pad*2), light)
-	paste(sheet, iconArt(levelHigh).render(iconPx), image.Pt(pad, y+pad))
+	paste(sheet, iconArt().render(iconPx), image.Pt(pad, y+pad))
 	y += iconPx + pad*2
 
-	levels := []level{levelMuted, levelLow, levelMid, levelHigh}
+	samples := []struct {
+		label string
+		muted bool
+		size  int
+	}{
+		{"8", false, 16}, {"40", false, 16}, {"100", false, 16}, {"40", true, 16}, {"-", false, 16},
+		{"40", false, 24}, {"100", false, 24},
+	}
 	for _, bg := range []color.NRGBA{light, dark} {
 		fill(sheet, image.Rect(0, y, width, y+trayRowH), bg)
 		x := pad
-		for _, l := range levels {
-			small := iconArt(l).render(trayPx)
+		for _, s := range samples {
+			small := trayicon.Draw(s.label, s.muted, s.size)
 			paste(sheet, small, image.Pt(x, y+pad))
 			paste(sheet, enlarge(small, zoom), image.Pt(x+trayPx+trayGap/2, y+pad))
-			x += trayPx + trayGap/2 + trayPx*zoom + trayGap
+			x += trayPx + trayGap/2 + s.size*zoom + trayGap
 		}
 		y += trayRowH
 	}
