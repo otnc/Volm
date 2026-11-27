@@ -6,11 +6,10 @@
 //	assets/icon.svg, assets/icon.png       the app icon; mygo build makes icon.png the exe icon
 //	assets/volm.ico                        16 to 256 px, for the installer
 //	assets/logo.svg                        the icon and the wordmark
-//	internal/tray/icons/<level>.png        32 px tray icons, one per volume band
 //	internal/settings/appicon.png          128 px, for the settings window
 //	internal/settings/logo.png             the logo at twice the size the settings window shows it
 //
-// Run it from the repository root after changing the artwork. With -preview, it also writes a sheet that shows the logo on light and dark backgrounds and the tray icons at their real size:
+// Run it from the repository root after changing the artwork. With -preview, it also writes a sheet that shows the logo on light and dark backgrounds and the tray icon, which internal/tray draws, at its real sizes:
 //
 //	go run ./tools/genicons
 //	go run ./tools/genicons -preview preview.png
@@ -32,7 +31,7 @@ func main() {
 	preview := flag.String("preview", "", "also write a review sheet of the artwork to this PNG path")
 	flag.Parse()
 
-	icon := iconArt(levelHigh)
+	icon := iconArt()
 	writeFile("assets/icon.svg", icon.svg())
 	writeFile("assets/icon.png", encodePNG(icon.render(1024)))
 	writeICO("assets/volm.ico", icon, []int{16, 20, 24, 32, 40, 48, 64, 128, 256})
@@ -42,9 +41,6 @@ func main() {
 	writeFile("assets/logo.svg", logo.svg())
 	writeFile("internal/settings/logo.png", encodePNG(logo.renderHeight(settingsLogoHeight*2)))
 
-	for _, l := range []level{levelMuted, levelLow, levelMid, levelHigh} {
-		writeFile(filepath.Join("internal/tray/icons", l.name+".png"), encodePNG(iconArt(l).render(32)))
-	}
 	if *preview != "" {
 		writeFile(*preview, encodePNG(previewSheet()))
 	}

@@ -11,7 +11,7 @@ import "math"
 //   - a round knob inside it, with a pointer at the end of the filled length
 //   - in the opening of the arc, a small speaker that says the knob is for sound
 //
-// Every band of the tray icon follows the same rule: the fill covers 0, 1/3, 2/3 or all of the scale. Muted turns the tile grey, empties the scale and crosses out the speaker.
+// The scale is filled all the way. The tray icon is not drawn here: internal/tray draws the volume as a number on the same indigo tile.
 //
 // The wordmark draws "Volm" with strokes of one width and round ends, and its "o" is the knob: the scale, open at the bottom and amber as in the icon, around an indigo dot.
 
@@ -21,7 +21,6 @@ var (
 	indigo      = hex(0x3F3CBB)
 	amber       = hex(0xFFB21E)
 	white       = hex(0xFFFFFF)
-	slate       = hex(0x6B7280)
 	scaleTrack  = white.withAlpha(0.28)
 	scaleStart  = -135.0 // degrees clockwise from 12 o'clock
 	scaleSweep  = 270.0
@@ -33,53 +32,28 @@ var (
 	knobRadius  = 7.0
 )
 
-type level struct {
-	name  string
-	fill  float64 // the filled share of the scale
-	muted bool
-}
-
-var (
-	levelMuted = level{name: "muted", muted: true}
-	levelLow   = level{name: "low", fill: 1.0 / 3}
-	levelMid   = level{name: "mid", fill: 2.0 / 3}
-	levelHigh  = level{name: "high", fill: 1}
-)
-
-func iconArt(l level) drawing {
-	tile := indigo
-	if l.muted {
-		tile = slate
-	}
-	end := scaleStart + scaleSweep*l.fill
+func iconArt() drawing {
+	end := scaleStart + scaleSweep
 	d := drawing{width: gridSize, height: gridSize}
 	d.shapes = append(d.shapes,
-		roundRect{x: 2, y: 2, w: 44, h: 44, radius: 11, fill: tile},
+		roundRect{x: 2, y: 2, w: 44, h: 44, radius: 11, fill: indigo},
 		arc{cx: iconCenterX, cy: iconCenterY, r: scaleRadius, from: scaleStart, to: scaleStart + scaleSweep, width: scaleWidth, stroke: scaleTrack},
+		arc{cx: iconCenterX, cy: iconCenterY, r: scaleRadius, from: scaleStart, to: end, width: scaleWidth, stroke: amber},
+		circle{cx: iconCenterX, cy: iconCenterY, r: knobRadius, fill: white},
+		pointer(iconCenterX, iconCenterY, end, indigo),
 	)
-	if l.fill > 0 {
-		d.shapes = append(d.shapes, arc{cx: iconCenterX, cy: iconCenterY, r: scaleRadius, from: scaleStart, to: end, width: scaleWidth, stroke: amber})
-	}
-	d.shapes = append(d.shapes, circle{cx: iconCenterX, cy: iconCenterY, r: knobRadius, fill: white})
-	d.shapes = append(d.shapes, pointer(iconCenterX, iconCenterY, end, tile))
-	d.shapes = append(d.shapes, speaker(l.muted)...)
+	d.shapes = append(d.shapes, speaker()...)
 	return d
 }
 
-// speaker sits centered in the opening at the bottom of the scale, clear of the knob and the arc's ends: a box and a cone, then one sound wave, or a cross when muted.
-func speaker(muted bool) []shape {
+// speaker sits centered in the opening at the bottom of the scale, clear of the knob and the arc's ends: a box, a cone and one sound wave.
+func speaker() []shape {
 	const cy = 37.0
-	shapes := []shape{
+	return []shape{
 		roundRect{x: 18.5, y: cy - 2, w: 3, h: 4, radius: 0.8, fill: white},
 		polygon{points: [][2]float64{{21, cy - 2}, {24.5, cy - 4.5}, {24.5, cy + 4.5}, {21, cy + 2}}, fill: white},
+		arc{cx: 24.5, cy: cy, r: 3.5, from: 45, to: 135, width: 1.6, stroke: white},
 	}
-	if muted {
-		return append(shapes,
-			line{x1: 26.5, y1: cy - 1.8, x2: 30, y2: cy + 1.8, width: 1.6, stroke: white},
-			line{x1: 26.5, y1: cy + 1.8, x2: 30, y2: cy - 1.8, width: 1.6, stroke: white},
-		)
-	}
-	return append(shapes, arc{cx: 24.5, cy: cy, r: 3.5, from: 45, to: 135, width: 1.6, stroke: white})
 }
 
 // pointer is the knob's mark, a short stroke from near the center toward angle deg, which stays inside the knob.
@@ -116,7 +90,7 @@ type accent struct{ arc }
 
 // logoArt places the icon and, to its right, the wordmark.
 func logoArt() drawing {
-	d := iconArt(levelHigh)
+	d := iconArt()
 	x := gridSize + logoGap
 	half := strokeWidth / 2
 	var letters []stroke
