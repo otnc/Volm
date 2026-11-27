@@ -53,7 +53,7 @@ func TestListenWhileAPreviousProcessHoldsTheEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer windows.CloseHandle(previous)
+	defer func() { _ = windows.CloseHandle(previous) }()
 	if err := windows.SetEvent(previous); err != nil {
 		t.Fatal(err)
 	}
