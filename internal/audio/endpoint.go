@@ -1,7 +1,7 @@
 // Copyright (C) 2026 otoneko.
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Package audio reads and changes the master volume and mute of the default playback device through Core Audio.
+// Package audio reads and changes the master volume and mute of the default playback or recording device through Core Audio.
 package audio
 
 import (
@@ -16,7 +16,16 @@ import (
 	"github.com/otnc/Volm/internal/control"
 )
 
-// State is the volume of the default playback device.
+// Flow says which kind of device an Endpoint follows.
+type Flow uint32
+
+// The flows, as Core Audio numbers them (EDataFlow).
+const (
+	Playback  Flow = wca.ERender
+	Recording Flow = wca.ECapture
+)
+
+// State is the volume of the default device.
 type State struct {
 	Percent int
 	Muted   bool
@@ -24,11 +33,12 @@ type State struct {
 	Device string
 }
 
-// ErrNoDevice reports that there is no active playback device.
-var ErrNoDevice = errors.New("audio: no default playback device")
+// ErrNoDevice reports that there is no active device of the endpoint's flow.
+var ErrNoDevice = errors.New("audio: no default device")
 
 // Endpoint owns every Core Audio object on one COM thread; its methods run there and wait for the result.
 type Endpoint struct {
+	flow    Flow
 	calls   chan func()
 	changes chan State
 	done    chan struct{}
@@ -41,16 +51,17 @@ type Endpoint struct {
 	device     string
 }
 
-// Open starts the COM thread and binds to the current default device. Changes reports every later change of volume, mute or default device, including those Volm makes itself.
+// Open starts the COM thread and binds to the current default device of flow. Changes reports every later change of volume, mute or default device, including those Volm makes itself.
 //
-//	ep, err := audio.Open()
+//	ep, err := audio.Open(audio.Playback)
 //	if err != nil {
 //		return err
 //	}
 //	defer ep.Close()
 //	st, err := ep.Step(1, 2, true) // up one notch of 2%
-func Open() (*Endpoint, error) {
+func Open(flow Flow) (*Endpoint, error) {
 	e := &Endpoint{
+		flow:    flow,
 		calls:   make(chan func()),
 		changes: make(chan State, 8),
 		done:    make(chan struct{}),
@@ -78,7 +89,7 @@ func (e *Endpoint) run(ready chan<- error) {
 
 	e.notifier = wca.NewIMMNotificationClient(wca.IMMNotificationClientCallback{
 		OnDefaultDeviceChanged: func(flow wca.EDataFlow, role wca.ERole, _ string) error {
-			if flow == wca.ERender && role == wca.EMultimedia {
+			if flow == wca.EDataFlow(e.flow) && role == wca.EMultimedia {
 				// Core Audio calls this on its own thread, which must not block on ours, and the enumerator may not be re-entered from here.
 				go e.do(e.rebind)
 			}
@@ -119,7 +130,7 @@ func (e *Endpoint) do(fn func()) {
 func (e *Endpoint) rebind() {
 	e.unbind()
 	var device *wca.IMMDevice
-	if err := e.enumerator.GetDefaultAudioEndpoint(wca.ERender, wca.EMultimedia, &device); err != nil {
+	if err := e.enumerator.GetDefaultAudioEndpoint(uint32(e.flow), wca.EMultimedia, &device); err != nil {
 		e.publish()
 		return
 	}

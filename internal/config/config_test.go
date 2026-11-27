@@ -53,6 +53,11 @@ func TestOptInFeaturesStartOff(t *testing.T) {
 	if Default().Volume.Acceleration {
 		t.Error("wheel acceleration is on by default")
 	}
+	for _, action := range []string{"micVolumeUp", "micVolumeDown", "toggleMicMute"} {
+		if keys := Default().Hotkeys[action]; len(keys) != 0 {
+			t.Errorf("%s has default keys %v", action, keys)
+		}
+	}
 }
 
 func TestLoadReadsPauseInFullscreen(t *testing.T) {

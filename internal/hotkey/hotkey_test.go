@@ -84,6 +84,25 @@ func TestBind(t *testing.T) {
 	}
 }
 
+// TestBindMicrophoneActions checks the names the settings file uses for the microphone actions.
+func TestBindMicrophoneActions(t *testing.T) {
+	b := Bind(map[string][]string{
+		"micVolumeUp":   {"Ctrl+Alt+Up"},
+		"micVolumeDown": {"Ctrl+Alt+Down"},
+		"toggleMicMute": {"Ctrl+Alt+M"},
+	})
+	want := Bindings{
+		{Mods: Ctrl | Alt, Key: 0x26}: MicVolumeUp,
+		{Mods: Ctrl | Alt, Key: 0x28}: MicVolumeDown,
+		{Mods: Ctrl | Alt, Key: 'M'}:  ToggleMicMute,
+	}
+	for c, a := range want {
+		if b[c] != a {
+			t.Errorf("%s = %q, want %q", c, b[c], a)
+		}
+	}
+}
+
 func TestBindSkipsTypingKeysAlone(t *testing.T) {
 	b := Bind(map[string][]string{"volumeUp": {"A", "F13"}, "playPause": {"MediaPlayPause"}})
 	if _, ok := b[Combo{Key: 'A'}]; ok {

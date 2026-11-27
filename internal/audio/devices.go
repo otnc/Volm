@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Device is an active playback device.
+// Device is an active device of an endpoint's flow.
 type Device struct {
 	ID      string
 	Name    string
@@ -32,7 +32,7 @@ const policyConfigSetDefaultEndpoint = 13
 // ErrSwitchUnsupported reports that Windows refused to change the default device through IPolicyConfig.
 var ErrSwitchUnsupported = errors.New("audio: Windows refused to switch the default device")
 
-// Devices lists the active playback devices, the default one marked.
+// Devices lists the active devices of the endpoint's flow, the default one marked.
 func (e *Endpoint) Devices() (devices []Device, err error) {
 	e.do(func() { devices, err = e.devices() })
 	return devices, err
@@ -40,7 +40,7 @@ func (e *Endpoint) Devices() (devices []Device, err error) {
 
 func (e *Endpoint) devices() ([]Device, error) {
 	var collection *wca.IMMDeviceCollection
-	if err := e.enumerator.EnumAudioEndpoints(wca.ERender, wca.DEVICE_STATE_ACTIVE, &collection); err != nil {
+	if err := e.enumerator.EnumAudioEndpoints(uint32(e.flow), wca.DEVICE_STATE_ACTIVE, &collection); err != nil {
 		return nil, err
 	}
 	defer collection.Release()
@@ -66,7 +66,7 @@ func (e *Endpoint) devices() ([]Device, error) {
 
 func (e *Endpoint) defaultID() string {
 	var d *wca.IMMDevice
-	if err := e.enumerator.GetDefaultAudioEndpoint(wca.ERender, wca.EMultimedia, &d); err != nil {
+	if err := e.enumerator.GetDefaultAudioEndpoint(uint32(e.flow), wca.EMultimedia, &d); err != nil {
 		return ""
 	}
 	defer d.Release()

@@ -36,6 +36,7 @@ type app struct {
 	stopWatch  context.CancelFunc
 
 	audio      *audio.Endpoint
+	mic        *audio.Endpoint     // nil when the recording side failed to start; playback still works
 	brightness *brightness.Manager // nil when it failed to start; volume still works
 	osd        *osd.OSD
 	taskbar    *taskbar.Finder // nil when UI Automation failed to start; per-app volume is then off
@@ -53,8 +54,11 @@ func newApp(configPath string, cfg config.Config) *app {
 // start runs on MyGo's main thread once the app is ready.
 func (a *app) start() error {
 	var err error
-	if a.audio, err = audio.Open(); err != nil {
+	if a.audio, err = audio.Open(audio.Playback); err != nil {
 		return err
+	}
+	if a.mic, err = audio.Open(audio.Recording); err != nil {
+		log.Printf("microphone: %v", err)
 	}
 	if a.osd, err = osd.New(); err != nil {
 		return err
@@ -66,11 +70,14 @@ func (a *app) start() error {
 		log.Printf("taskbar: %v", err)
 	}
 	if a.tray, err = tray.New(tray.Actions{
-		ToggleMute:   func() { go a.toggleMute(win32.CursorPos()) },
-		Devices:      a.trayDevices,
-		SelectDevice: func(id string) { go a.selectDevice(id) },
-		OpenSettings: openSettings,
-		Quit:         mygo.App.Quit,
+		ToggleMute:        func() { go a.toggleMute(win32.CursorPos()) },
+		ToggleMicMute:     func() { go a.toggleMicMute(win32.CursorPos()) },
+		Devices:           func() []tray.Device { return trayDevices(a.audio) },
+		SelectDevice:      func(id string) { go a.selectDevice(a.audio, id) },
+		InputDevices:      func() []tray.Device { return trayDevices(a.mic) },
+		SelectInputDevice: func(id string) { go a.selectDevice(a.mic, id) },
+		OpenSettings:      openSettings,
+		Quit:              mygo.App.Quit,
 	}); err != nil {
 		return err
 	}
@@ -82,6 +89,9 @@ func (a *app) start() error {
 	}
 	go a.handleHotkeys()
 	go a.followVolume()
+	if a.mic != nil {
+		go a.followMic()
+	}
 	go a.handleInput()
 	a.watchConfig()
 	return nil
@@ -106,6 +116,9 @@ func (a *app) stop() {
 	}
 	if a.audio != nil {
 		a.audio.Close()
+	}
+	if a.mic != nil {
+		a.mic.Close()
 	}
 }
 
@@ -244,6 +257,41 @@ func (a *app) show(content osd.Content, at win32.Point) {
 	})
 }
 
+// stepMic changes the microphone's volume by the configured step. It never unmutes: a microphone that turns on by surprise is worse than one that stays muted.
+func (a *app) stepMic(notches int, at win32.Point) {
+	if a.mic == nil {
+		return
+	}
+	st, err := a.mic.Step(notches, a.cfg.Load().Volume.Step, false)
+	a.showMic(st, err, at)
+}
+
+func (a *app) toggleMicMute(at win32.Point) {
+	if a.mic == nil {
+		return
+	}
+	st, err := a.mic.ToggleMute()
+	a.showMic(st, err, at)
+}
+
+func (a *app) showMic(st audio.State, err error, at win32.Point) {
+	if err != nil && !errors.Is(err, audio.ErrNoDevice) {
+		log.Printf("microphone: %v", err)
+	}
+	content := osd.Content{Icon: osd.MicrophoneIcon(st.Muted), Title: st.Device, Percent: st.Percent, Muted: st.Muted}
+	if err != nil {
+		content = osd.Content{Icon: osd.IconMicOff, Title: "録音デバイスがありません"}
+	}
+	a.show(content, at)
+}
+
+// followMic keeps the tray menu's microphone check in step with the device.
+func (a *app) followMic() {
+	for st := range a.mic.Changes() {
+		a.tray.UpdateMic(st.Muted, st.Device != "")
+	}
+}
+
 // followVolume keeps the tray in step with the device, including changes made by other apps and a switch of the default device.
 func (a *app) followVolume() {
 	for st := range a.audio.Changes() {
@@ -326,13 +374,22 @@ func (a *app) handleHotkeys() {
 			win32.SendKeyPress(vkMediaPrevious)
 		case hotkey.NextDevice:
 			a.nextDevice(at)
+		case hotkey.MicVolumeUp:
+			a.stepMic(1, at)
+		case hotkey.MicVolumeDown:
+			a.stepMic(-1, at)
+		case hotkey.ToggleMicMute:
+			a.toggleMicMute(at)
 		}
 	}
 }
 
-// trayDevices runs on MyGo's main thread as the tray menu opens.
-func (a *app) trayDevices() []tray.Device {
-	devices, err := a.audio.Devices()
+// trayDevices runs on MyGo's main thread as the tray menu opens. ep may be nil, when the microphone side failed to start.
+func trayDevices(ep *audio.Endpoint) []tray.Device {
+	if ep == nil {
+		return nil
+	}
+	devices, err := ep.Devices()
 	if err != nil {
 		log.Printf("listing devices: %v", err)
 		return nil
@@ -344,9 +401,13 @@ func (a *app) trayDevices() []tray.Device {
 	return out
 }
 
-func (a *app) selectDevice(id string) {
-	if err := a.audio.SetDefault(id); err != nil {
-		a.deviceSwitchFailed(err)
+func (a *app) selectDevice(ep *audio.Endpoint, id string) {
+	if err := ep.SetDefault(id); err != nil {
+		kind := "出力デバイス"
+		if ep == a.mic {
+			kind = "入力デバイス"
+		}
+		a.deviceSwitchFailed(kind, err)
 	}
 }
 
@@ -356,19 +417,19 @@ func (a *app) nextDevice(at win32.Point) {
 			a.showVolume(audio.State{}, err, at)
 			return
 		}
-		a.deviceSwitchFailed(err)
+		a.deviceSwitchFailed("出力デバイス", err)
 		return
 	}
 	st, err := a.audio.Current()
 	a.showVolume(st, err, at)
 }
 
-// deviceSwitchFailed tells the user and opens the sound settings of Windows, where the device can be chosen by hand. IPolicyConfig, which Volm switches with, is undocumented and could stop working after an update of Windows.
-func (a *app) deviceSwitchFailed(err error) {
+// deviceSwitchFailed tells the user and opens the sound settings of Windows, where the device can be chosen by hand. IPolicyConfig, which Volm switches with, is undocumented and could stop working after an update of Windows. kind is "出力デバイス" or "入力デバイス", as the tray menu names them.
+func (a *app) deviceSwitchFailed(kind string, err error) {
 	log.Printf("switching device: %v", err)
 	n := mygo.NewNotification(mygo.NotificationOptions{
-		Title: "出力デバイスを切り替えられませんでした",
-		Body:  "Windows のサウンドの設定を開きます。そこで出力デバイスを選んでください。",
+		Title: kind + "を切り替えられませんでした",
+		Body:  "Windows のサウンドの設定を開きます。そこで" + kind + "を選んでください。",
 	})
 	if err := n.Show(); err != nil {
 		log.Printf("notifying: %v", err)
