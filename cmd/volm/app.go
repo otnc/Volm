@@ -142,6 +142,7 @@ func (a *app) takes(ev hook.Event) bool {
 func (a *app) handleInput() {
 	// Volume and brightness count notches apart, so that pressing Ctrl in the middle of a gesture does not carry a partial notch over.
 	var volumeNotches, brightnessNotches, appNotches control.NotchCounter
+	var volumeAccel, appAccel control.Accelerator
 	var apps appCache
 	var lastWheel time.Time
 	for ev := range a.events {
@@ -157,14 +158,14 @@ func (a *app) handleInput() {
 				// Alt is still held; without this, the foreground app focuses its menu bar when it is released.
 				win32.SendMaskKey()
 				if n := appNotches.Add(ev.Delta); n != 0 {
-					a.stepAppVolume(n, ev, &apps)
+					a.stepAppVolume(n, a.wheelStep(false, appAccel.Factor(ev.Time, n)), ev, &apps)
 				}
 			} else if ev.Ctrl {
 				if n := brightnessNotches.Add(ev.Delta); n != 0 {
 					a.stepBrightness(n, ev.Shift, ev.Pos)
 				}
 			} else if n := volumeNotches.Add(ev.Delta); n != 0 {
-				a.stepVolume(n, ev.Pos)
+				a.stepVolume(n, a.wheelStep(ev.Shift, volumeAccel.Factor(ev.Time, n)), ev.Pos)
 			}
 		case hook.MiddleClick:
 			a.toggleMute(ev.Pos)
@@ -172,9 +173,21 @@ func (a *app) handleInput() {
 	}
 }
 
-func (a *app) stepVolume(notches int, at win32.Point) {
+// wheelStep returns the percent one notch of the wheel moves a volume by: 1 for fine adjustment with Shift, else the configured step, multiplied by the accelerator's factor when acceleration is on.
+func (a *app) wheelStep(fine bool, factor int) int {
 	vol := a.cfg.Load().Volume
-	st, err := a.audio.Step(notches, vol.Step, vol.UnmuteOnIncrease)
+	switch {
+	case fine:
+		return 1
+	case vol.Acceleration:
+		return vol.Step * factor
+	default:
+		return vol.Step
+	}
+}
+
+func (a *app) stepVolume(notches, step int, at win32.Point) {
+	st, err := a.audio.Step(notches, step, a.cfg.Load().Volume.UnmuteOnIncrease)
 	a.showVolume(st, err, at)
 }
 
@@ -296,9 +309,9 @@ func (a *app) handleHotkeys() {
 		at := win32.CursorPos()
 		switch ev.Action {
 		case hotkey.VolumeUp:
-			a.stepVolume(1, at)
+			a.stepVolume(1, a.cfg.Load().Volume.Step, at)
 		case hotkey.VolumeDown:
-			a.stepVolume(-1, at)
+			a.stepVolume(-1, a.cfg.Load().Volume.Step, at)
 		case hotkey.ToggleMute:
 			a.toggleMute(at)
 		case hotkey.BrightnessUp:
@@ -375,7 +388,7 @@ type appCache struct {
 const appCacheLifetime = 2 * time.Second
 
 // stepAppVolume changes the volume of the app whose taskbar button, or window title bar, is under the cursor. Over anything else on the taskbar it does nothing.
-func (a *app) stepAppVolume(notches int, ev hook.Event, cache *appCache) {
+func (a *app) stepAppVolume(notches, step int, ev hook.Event, cache *appCache) {
 	at := ev.Pos
 	var button taskbar.Button
 	var err error
@@ -399,8 +412,7 @@ func (a *app) stepAppVolume(notches int, ev hook.Event, cache *appCache) {
 		}
 		*cache = appCache{button: button, target: target, found: time.Now()}
 	}
-	vol := a.cfg.Load().Volume
-	st, err := a.audio.StepApp(cache.target, notches, vol.Step, vol.UnmuteOnIncrease)
+	st, err := a.audio.StepApp(cache.target, notches, step, a.cfg.Load().Volume.UnmuteOnIncrease)
 	if err != nil {
 		log.Printf("app volume: %v", err)
 		return

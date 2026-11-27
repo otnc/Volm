@@ -55,6 +55,8 @@ type Volume struct {
 	AppVolumeWithAlt bool `json:"appVolumeWithAlt"`
 	// AppVolumeOnTitleBar lets Alt+wheel over a window's title bar, or a browser's tabs, change that app's volume.
 	AppVolumeOnTitleBar bool `json:"appVolumeOnTitleBar"`
+	// Acceleration multiplies the step, up to four times, while the wheel turns quickly (see control.Accelerator).
+	Acceleration bool `json:"acceleration"`
 }
 
 // Brightness holds the settings of Ctrl+wheel on the taskbar.

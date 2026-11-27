@@ -5,6 +5,7 @@
 package hook
 
 import (
+	"time"
 	"unsafe"
 
 	"github.com/otnc/Volm/internal/win32"
@@ -32,6 +33,8 @@ type Event struct {
 	OnTitleBar       bool
 	Window           uintptr
 	Ctrl, Shift, Alt bool
+	// Time is when the hook saw the event. The handler can fall behind while it changes the volume and draws the OSD, so gaps between events are measured with this rather than when they are handled.
+	Time time.Time
 }
 
 // Filter decides, inside the hook callback, whether Volm takes the event. A taken event is sent to the channel and withheld from every other app. It must return quickly: Windows removes a hook that does not return within LowLevelHooksTimeout, without telling the app.
@@ -107,6 +110,7 @@ func (h *mouseHook) handleMessage(message uintptr, info *win32.MSLLHookStruct) b
 		return false
 	}
 	ev.Pos = info.Pt
+	ev.Time = time.Now()
 	ev.OnTaskbar, ev.Window = h.taskbar.at(info.Pt)
 	if !ev.OnTaskbar && ev.Window != 0 && !h.taskbar.isDesktop {
 		ev.OnTitleBar = win32.OnTitleBar(ev.Window, info.Pt)
