@@ -11,22 +11,23 @@ import (
 	"github.com/otnc/Volm/internal/trayicon"
 )
 
-// previewSheet lays out what to check after changing the artwork: the logo on a light and a dark background, the icon large, and tray icons for a few volumes at 16 and 24 px (100% and 150% scale), at their real size and enlarged without smoothing, on both kinds of taskbar.
+// previewSheet lays out what to check after changing the artwork: the logo on a light and a dark background, the icon large, and the tray icon in the states of traySamples at each of traySizes, at its real size and enlarged without smoothing, on both kinds of taskbar.
 func previewSheet() *image.NRGBA {
 	const (
 		width   = 1200
 		pad     = 40
 		logoH   = 160
 		iconPx  = 320
-		trayPx  = 24
 		zoom    = 4
 		trayGap = 20
 	)
 	light := color.NRGBA{0xF3, 0xF3, 0xF3, 0xFF}
 	dark := color.NRGBA{0x1C, 0x1C, 0x1F, 0xFF}
 	rowH := logoH + pad*2
-	trayRowH := trayPx*zoom + pad*2
-	height := rowH*2 + iconPx + pad*2 + trayRowH*2
+	height := rowH*2 + iconPx + pad*2
+	for _, size := range traySizes {
+		height += (size*zoom + pad) * 2
+	}
 	sheet := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	y := 0
@@ -41,26 +42,32 @@ func previewSheet() *image.NRGBA {
 	paste(sheet, iconArt().render(iconPx), image.Pt(pad, y+pad))
 	y += iconPx + pad*2
 
-	samples := []struct {
-		label string
-		muted bool
-		size  int
-	}{
-		{"8", false, 16}, {"40", false, 16}, {"100", false, 16}, {"40", true, 16}, {"-", false, 16},
-		{"40", false, 24}, {"100", false, 24},
-	}
-	for _, bg := range []color.NRGBA{light, dark} {
-		fill(sheet, image.Rect(0, y, width, y+trayRowH), bg)
-		x := pad
-		for _, s := range samples {
-			small := trayicon.Draw(s.label, s.muted, s.size)
-			paste(sheet, small, image.Pt(x, y+pad))
-			paste(sheet, enlarge(small, zoom), image.Pt(x+trayPx+trayGap/2, y+pad))
-			x += trayPx + trayGap/2 + s.size*zoom + trayGap
+	for _, size := range traySizes {
+		rowH := size*zoom + pad
+		for _, bg := range []color.NRGBA{light, dark} {
+			fill(sheet, image.Rect(0, y, width, y+rowH), bg)
+			x := pad
+			for _, s := range traySamples {
+				small := trayicon.Draw(s.percent, s.hasDevice, s.muted, size)
+				paste(sheet, small, image.Pt(x, y+pad/2))
+				paste(sheet, enlarge(small, zoom), image.Pt(x+size+trayGap/2, y+pad/2))
+				x += size + trayGap/2 + 32*zoom + trayGap
+			}
+			y += rowH
 		}
-		y += trayRowH
 	}
 	return sheet
+}
+
+// traySizes are the tray icon sizes at display scales of 100%, 125%, 150% and 200%.
+var traySizes = []int{16, 20, 24, 32}
+
+// traySamples are the states the sheet shows, left to right: 0, 10, 50 and 100%, 50% muted, and no playback device.
+var traySamples = []struct {
+	percent          int
+	hasDevice, muted bool
+}{
+	{0, true, false}, {10, true, false}, {50, true, false}, {100, true, false}, {50, true, true}, {0, false, false},
 }
 
 func fill(dst *image.NRGBA, r image.Rectangle, c color.NRGBA) {

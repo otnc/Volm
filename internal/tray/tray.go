@@ -44,17 +44,18 @@ type Tray struct {
 }
 
 type iconKey struct {
-	label string
-	muted bool
-	size  int
+	percent   int
+	hasDevice bool
+	muted     bool
+	size      int
 }
 
 // New adds the icon. Call it once MyGo is ready (in mygo.App.WhenReady).
 func New(actions Actions) (*Tray, error) {
-	t := &Tray{actions: actions, shown: iconKey{label: trayicon.Label(0, false), size: win32.TrayIconSize()}}
+	t := &Tray{actions: actions, shown: iconKey{size: win32.TrayIconSize()}}
 	icon, err := mygo.NewTray(mygo.TrayOptions{
 		ID:      "volm",
-		Icon:    trayicon.EncodePNG(trayicon.Draw(t.shown.label, t.shown.muted, t.shown.size)),
+		Icon:    trayicon.EncodePNG(trayicon.Draw(t.shown.percent, t.shown.hasDevice, t.shown.muted, t.shown.size)),
 		ToolTip: "Volm",
 		Menu:    t.menu(nil, nil),
 	})
@@ -109,9 +110,9 @@ func (t *Tray) UpdateMic(muted, hasMic bool) {
 func (t *Tray) Update(percent int, muted bool, device string) {
 	mygo.RunOnMain(func() {
 		// The size is looked up again on every change, so that a new display scale takes effect with the next change of the volume.
-		key := iconKey{label: trayicon.Label(percent, device != ""), muted: muted, size: win32.TrayIconSize()}
+		key := iconKey{percent: percent, hasDevice: device != "", muted: muted, size: win32.TrayIconSize()}
 		if key != t.shown {
-			if err := t.icon.SetIcon(trayicon.EncodePNG(trayicon.Draw(key.label, key.muted, key.size)), false); err != nil {
+			if err := t.icon.SetIcon(trayicon.EncodePNG(trayicon.Draw(key.percent, key.hasDevice, key.muted, key.size)), false); err != nil {
 				log.Printf("tray: setting icon: %v", err)
 			} else {
 				t.shown = key
